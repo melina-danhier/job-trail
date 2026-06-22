@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: JobTrail
+
+  flyway:
+    enabled: true
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false

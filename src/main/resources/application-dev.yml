@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/jobtrail
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
