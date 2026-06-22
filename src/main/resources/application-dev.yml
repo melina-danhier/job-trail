@@ -1,5 +1,9 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/jobtrail
+    url: jdbc:postgresql://localhost:5433/jobtrail
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
+
+logging:
+  level:
+    org.hibernate.SQL: debug
