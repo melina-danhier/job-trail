@@ -1,5 +1,6 @@
 package com.melina.jobtrail.controller;
 
+import com.melina.jobtrail.dto.LoginRequest;
 import com.melina.jobtrail.dto.RegisterRequest;
 import com.melina.jobtrail.dto.UserDto;
 import com.melina.jobtrail.exception.EmailAlreadyExistsException;
@@ -15,15 +16,18 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -111,5 +115,24 @@ class AuthControllerTest {
                 .andExpect(status().isConflict());
 
         verify(userService).createUser(any(RegisterRequest.class));
+    }
+
+    @Test
+    void login_withValidCredentials_shouldReturnJwt() throws Exception {
+        LoginRequest loginRequest = new LoginRequest("user@example.com", "password1234");
+        when(jwtUtil.generateToken(loginRequest.email())).thenReturn("signed-jwt");
+
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isOk())
+                .andExpect(content().string("signed-jwt"));
+
+        verify(authenticationManager).authenticate(argThat(authentication ->
+                authentication instanceof UsernamePasswordAuthenticationToken
+                        && loginRequest.email().equals(authentication.getPrincipal())
+                        && loginRequest.password().equals(authentication.getCredentials())
+        ));
+        verify(jwtUtil).generateToken(loginRequest.email());
     }
 }
