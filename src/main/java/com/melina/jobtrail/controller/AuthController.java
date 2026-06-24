@@ -40,4 +40,10 @@ public class AuthController {
         String token = jwtUtil.generateToken(loginRequest.email());
         return ResponseEntity.ok(token);
     }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> getMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        UserDto user = userService.getMe(userDetails.email());
+        return ResponseEntity.ok(user);
+    }
 }

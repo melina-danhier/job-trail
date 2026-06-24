@@ -1,17 +1,7 @@
 package com.melina.jobtrail.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import com.melina.jobtrail.util.ApplicationStatus;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -43,15 +33,16 @@ public class Application {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(name = "position_title", nullable = false)
+    private String positionTitle;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
-    @Column(name = "position_title", nullable = false)
-    private String positionTitle;
-
     @Column(nullable = false)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private ApplicationStatus status;
 
     @Column(name = "application_date")
     private LocalDate applicationDate;

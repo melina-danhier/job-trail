@@ -24,6 +24,16 @@ public class GlobalExceptionHandler {
         return createErrorResponseEntity(HttpStatus.CONFLICT,ex.getMessage());
     }
 
+    @ExceptionHandler(ApplicationNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleApplicationNotFoundException(ApplicationNotFoundException ex) {
+        return createErrorResponseEntity(HttpStatus.NOT_FOUND,ex.getMessage());
+    }
+
+    @ExceptionHandler(CompanyNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleCompanyNotFoundException(CompanyNotFoundException ex) {
+        return createErrorResponseEntity(HttpStatus.NOT_FOUND,ex.getMessage());
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException() {
         return createErrorResponseEntity(HttpStatus.CONFLICT,"Data integrity violation");

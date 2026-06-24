@@ -23,6 +23,11 @@ public class UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
+    public UserDto getMe(String email) {
+        User user = findUserOrThrow(email);
+        return userMapper.toDto(user);
+    }
+
     public UserDto createUser(RegisterRequest registerRequest) {
         String normalizedEmail = normalizeEmail(registerRequest.email());
         if (userRepository.existsByEmail(normalizedEmail)) {
@@ -38,13 +43,16 @@ public class UserService {
     }
 
     public UserDto getUserByEmail(@NonNull String email) {
-        String normalizedEmail = normalizeEmail(email);
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new UserNotFoundException(normalizedEmail));
+        User user = findUserOrThrow(email);
         return userMapper.toDto(user);
     }
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    User findUserOrThrow(String email) {
+        return userRepository.findByEmail(normalizeEmail(email))
+                .orElseThrow(() -> new UserNotFoundException(email));
     }
 }
