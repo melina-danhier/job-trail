@@ -4,9 +4,12 @@ import com.melina.jobtrail.dto.LoginRequest;
 import com.melina.jobtrail.dto.RegisterRequest;
 import com.melina.jobtrail.dto.UserDto;
 import com.melina.jobtrail.exception.EmailAlreadyExistsException;
+import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.security.JwtAuthFilter;
 import com.melina.jobtrail.service.UserService;
 import com.melina.jobtrail.util.JwtUtil;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -16,16 +19,21 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
+
+import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -53,19 +61,36 @@ class AuthControllerTest {
     @MockitoBean
     private JwtAuthFilter jwtAuthFilter;
 
+    @BeforeEach
+    void setUpAuthentication() {
+        CustomUserDetails userDetails = new CustomUserDetails("user@example.com", "passwordHash");
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
+        );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
     void register_withValidRequest_shouldReturnUserDto() throws Exception {
         RegisterRequest registerRequest = new RegisterRequest("user@example.com", "password1234");
-        UserDto userDto = new UserDto(1L, "user@example.com", null);
+        UserDto userDto = new UserDto("user@example.com", null);
 
         when(userService.createUser(any(RegisterRequest.class))).thenReturn(userDto);
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.email").value("user@example.com"));
+                .andExpectAll(
+                        status().isCreated(),
+                        jsonPath("$.email").value("user@example.com")
+                );
 
         verify(userService).createUser(any(RegisterRequest.class));
     }
@@ -79,9 +104,11 @@ class AuthControllerTest {
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Validation failed"))
-                .andExpect(jsonPath("$.fieldErrors").isNotEmpty());
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.message").value("Validation failed"),
+                        jsonPath("$.fieldErrors").isNotEmpty()
+                );
 
         verifyNoInteractions(userService);
     }
@@ -95,9 +122,11 @@ class AuthControllerTest {
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Validation failed"))
-                .andExpect(jsonPath("$.fieldErrors").isNotEmpty());
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.message").value("Validation failed"),
+                        jsonPath("$.fieldErrors").isNotEmpty()
+                );
 
         verifyNoInteractions(userService);
     }
@@ -120,13 +149,16 @@ class AuthControllerTest {
     @Test
     void login_withValidCredentials_shouldReturnJwt() throws Exception {
         LoginRequest loginRequest = new LoginRequest("user@example.com", "password1234");
+
         when(jwtUtil.generateToken(loginRequest.email())).thenReturn("signed-jwt");
 
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isOk())
-                .andExpect(content().string("signed-jwt"));
+                .andExpectAll(
+                        status().isOk(),
+                        content().string("signed-jwt")
+                );
 
         verify(authenticationManager).authenticate(argThat(authentication ->
                 authentication instanceof UsernamePasswordAuthenticationToken
@@ -134,5 +166,35 @@ class AuthControllerTest {
                         && loginRequest.password().equals(authentication.getCredentials())
         ));
         verify(jwtUtil).generateToken(loginRequest.email());
+    }
+
+    @Test
+    void login_withInvalidCredentials_returnsUnauthorized () throws Exception {
+        LoginRequest loginRequest = new LoginRequest("user@example.com", "invalid-password");
+
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenThrow(new BadCredentialsException("Bad credentials"));
+
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(jwtUtil);
+    }
+
+    @Test
+    void getMe_returnsAuthenticatedUser() throws Exception {
+        UserDto userDto = new UserDto("user@example.com", Instant.parse("2026-06-24T12:00:00Z"));
+        when(userService.getMe("user@example.com")).thenReturn(userDto);
+
+        mockMvc.perform(get("/auth/me"))
+                .andExpectAll(
+                        status().isOk(),
+                        jsonPath("$.email").value("user@example.com"),
+                        jsonPath("$.createdAt").value("2026-06-24T12:00:00Z")
+                );
+
+        verify(userService).getMe("user@example.com");
     }
 }
