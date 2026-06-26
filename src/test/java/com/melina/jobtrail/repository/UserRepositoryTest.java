@@ -44,4 +44,22 @@ class UserRepositoryTest {
         Optional<User> result = userRepository.findByEmail("nonexisting@example.com");
         assertTrue(result.isEmpty());
     }
+
+    @Test
+    void existsByEmail_returnsTrueIfEmailExists () {
+        User user = User.builder()
+                .email("user@example.com")
+                .passwordHash("password1234")
+                .build();
+        entityManager.persist(user);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertTrue(userRepository.existsByEmail("user@example.com"));
+    }
+
+    @Test
+    void existsByEmail_returnsFalseIfEmailDoesNotExist () {
+        assertFalse(userRepository.existsByEmail("nonexisting@example.com"));
+    }
 }
