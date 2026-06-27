@@ -1,13 +1,14 @@
-package com.melina.jobtrail.dto;
+package com.melina.jobtrail.dto.application;
 
+import com.melina.jobtrail.dto.CompanyResponse;
 import com.melina.jobtrail.util.ApplicationStatus;
 
 import java.time.Instant;
 import java.time.LocalDate;
 
-public record ApplicationDto(
+public record ApplicationResponse(
         long id,
-        CompanyDto company,
+        CompanyResponse company,
         String positionTitle,
         ApplicationStatus status,
         LocalDate applicationDate,

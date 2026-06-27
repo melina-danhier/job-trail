@@ -1,7 +1,8 @@
 package com.melina.jobtrail.service;
 
-import com.melina.jobtrail.dto.ApplicationDto;
-import com.melina.jobtrail.dto.RequestApplicationDto;
+import com.melina.jobtrail.dto.application.ApplicationRequest;
+import com.melina.jobtrail.dto.application.ApplicationResponse;
+import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.entity.Application;
 import com.melina.jobtrail.entity.Company;
 import com.melina.jobtrail.entity.User;
@@ -24,7 +25,7 @@ public class ApplicationService {
     private final UserService userService;
     private final CompanyService companyService;
 
-    public ApplicationDto createApplication(String email, RequestApplicationDto requestDto) {
+    public ApplicationResponse createApplication(String email, ApplicationRequest requestDto) {
         User user = userService.findUserOrThrow(email);
         Company company = companyService.findCompanyOrThrow(requestDto.companyId(), user.getId());
 
@@ -37,23 +38,23 @@ public class ApplicationService {
                         .jobUrl(requestDto.jobUrl())
                         .build();
         application = applicationRepository.save(application);
-        return applicationMapper.toDto(application);
+        return applicationMapper.toResponse(application);
     }
 
-    public List<ApplicationDto> getApplications(String email) {
+    public List<ApplicationResponse> getApplications(String email) {
         User user = userService.findUserOrThrow(email);
         List<Application> applications = applicationRepository.findAllByUserId(user.getId());
-        return applicationMapper.toDtoList(applications);
+        return applicationMapper.toResponseList(applications);
     }
 
-    public ApplicationDto getApplicationById(String email, long id) {
+    public ApplicationResponse getApplicationById(String email, long id) {
         User user = userService.findUserOrThrow(email);
         Application application = findApplicationOrThrow(id, user.getId());
-        return applicationMapper.toDto(application);
+        return applicationMapper.toResponse(application);
     }
 
-    public ApplicationDto updateApplication(
-            String email, long id, RequestApplicationDto requestDto
+    public ApplicationResponse updateApplication(
+            String email, long id, ApplicationRequest requestDto
     ) {
         User user = userService.findUserOrThrow(email);
         Application application = findApplicationOrThrow(id, user.getId());
@@ -61,7 +62,14 @@ public class ApplicationService {
         applicationMapper.updateApplication(application, requestDto);
         application.setCompany(company);
         application = applicationRepository.save(application);
-        return applicationMapper.toDto(application);
+        return applicationMapper.toResponse(application);
+    }
+
+    public ApplicationResponse updateApplicationStatus(String email, long id, ApplicationUpdateStatusRequest requestDto) {
+        Application application = findApplicationOrThrow(id, userService.findUserOrThrow(email).getId());
+        application.setStatus(requestDto.status());
+        application = applicationRepository.save(application);
+        return applicationMapper.toResponse(application);
     }
 
     public void deleteApplication(String email, long id) {

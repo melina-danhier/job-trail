@@ -2,7 +2,7 @@ package com.melina.jobtrail.controller;
 
 import com.melina.jobtrail.dto.LoginRequest;
 import com.melina.jobtrail.dto.RegisterRequest;
-import com.melina.jobtrail.dto.UserDto;
+import com.melina.jobtrail.dto.UserResponse;
 import com.melina.jobtrail.exception.EmailAlreadyExistsException;
 import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.security.JwtAuthFilter;
@@ -80,9 +80,9 @@ class AuthControllerTest {
     @Test
     void register_withValidRequest_shouldReturnUserDto() throws Exception {
         RegisterRequest registerRequest = new RegisterRequest("user@example.com", "password1234");
-        UserDto userDto = new UserDto("user@example.com", null);
+        UserResponse userResponse = new UserResponse("user@example.com", null);
 
-        when(userService.createUser(any(RegisterRequest.class))).thenReturn(userDto);
+        when(userService.createUser(any(RegisterRequest.class))).thenReturn(userResponse);
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -185,8 +185,8 @@ class AuthControllerTest {
 
     @Test
     void getMe_returnsAuthenticatedUser() throws Exception {
-        UserDto userDto = new UserDto("user@example.com", Instant.parse("2026-06-24T12:00:00Z"));
-        when(userService.getMe("user@example.com")).thenReturn(userDto);
+        UserResponse userResponse = new UserResponse("user@example.com", Instant.parse("2026-06-24T12:00:00Z"));
+        when(userService.getMe("user@example.com")).thenReturn(userResponse);
 
         mockMvc.perform(get("/auth/me"))
                 .andExpectAll(

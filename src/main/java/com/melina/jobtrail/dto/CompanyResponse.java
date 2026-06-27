@@ -1,6 +1,6 @@
 package com.melina.jobtrail.dto;
 
-public record CompanyDto(
+public record CompanyResponse(
         long id,
         String name,
         String website,

@@ -1,7 +1,7 @@
 package com.melina.jobtrail.service;
 
 import com.melina.jobtrail.dto.RegisterRequest;
-import com.melina.jobtrail.dto.UserDto;
+import com.melina.jobtrail.dto.UserResponse;
 import com.melina.jobtrail.entity.User;
 import com.melina.jobtrail.exception.EmailAlreadyExistsException;
 import com.melina.jobtrail.exception.UserNotFoundException;
@@ -23,12 +23,12 @@ public class UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
-    public UserDto getMe(String email) {
+    public UserResponse getMe(String email) {
         User user = findUserOrThrow(email);
-        return userMapper.toDto(user);
+        return userMapper.toResponse(user);
     }
 
-    public UserDto createUser(RegisterRequest registerRequest) {
+    public UserResponse createUser(RegisterRequest registerRequest) {
         String normalizedEmail = normalizeEmail(registerRequest.email());
         if (userRepository.existsByEmail(normalizedEmail)) {
             throw new EmailAlreadyExistsException(normalizedEmail);
@@ -39,12 +39,12 @@ public class UserService {
                 .passwordHash(passwordEncoder.encode(registerRequest.password()))
                 .build();
         user = userRepository.save(user);
-        return userMapper.toDto(user);
+        return userMapper.toResponse(user);
     }
 
-    public UserDto getUserByEmail(@NonNull String email) {
+    public UserResponse getUserByEmail(@NonNull String email) {
         User user = findUserOrThrow(email);
-        return userMapper.toDto(user);
+        return userMapper.toResponse(user);
     }
 
     private String normalizeEmail(String email) {

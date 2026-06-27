@@ -1,7 +1,8 @@
 package com.melina.jobtrail.controller;
 
-import com.melina.jobtrail.dto.ApplicationDto;
-import com.melina.jobtrail.dto.RequestApplicationDto;
+import com.melina.jobtrail.dto.application.ApplicationRequest;
+import com.melina.jobtrail.dto.application.ApplicationResponse;
+import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.service.ApplicationService;
 import jakarta.validation.Valid;
@@ -20,37 +21,47 @@ public class ApplicationController {
     private final ApplicationService applicationService;
 
     @PostMapping
-    public ResponseEntity<ApplicationDto> createApplication(
+    public ResponseEntity<ApplicationResponse> createApplication(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Valid @RequestBody RequestApplicationDto requestDto
+            @Valid @RequestBody ApplicationRequest requestDto
     ) {
-        ApplicationDto dto = applicationService.createApplication(userDetails.email(),requestDto);
+        ApplicationResponse dto = applicationService.createApplication(userDetails.email(),requestDto);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
     @GetMapping
-    public ResponseEntity<List<ApplicationDto>> getApplications(
+    public ResponseEntity<List<ApplicationResponse>> getApplications(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(applicationService.getApplications(userDetails.email()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApplicationDto> getApplicationById(
+    public ResponseEntity<ApplicationResponse> getApplicationById(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable long id
     ) {
-        ApplicationDto dto = applicationService.getApplicationById(userDetails.email(),id);
+        ApplicationResponse dto = applicationService.getApplicationById(userDetails.email(),id);
         return ResponseEntity.ok(dto);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApplicationDto> updateApplication(
+    public ResponseEntity<ApplicationResponse> updateApplication(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable long id,
-            @Valid @RequestBody RequestApplicationDto requestDto
+            @Valid @RequestBody ApplicationRequest requestDto
     ) {
-        ApplicationDto dto = applicationService.updateApplication(userDetails.email(),id,requestDto);
+        ApplicationResponse dto = applicationService.updateApplication(userDetails.email(),id,requestDto);
+        return ResponseEntity.ok(dto);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ApplicationResponse> updateApplicationStatus(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long id,
+            @Valid @RequestBody ApplicationUpdateStatusRequest requestDto
+    ) {
+        ApplicationResponse dto = applicationService.updateApplicationStatus(userDetails.email(),id,requestDto);
         return ResponseEntity.ok(dto);
     }
 

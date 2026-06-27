@@ -2,7 +2,7 @@ package com.melina.jobtrail.controller;
 
 import com.melina.jobtrail.dto.LoginRequest;
 import com.melina.jobtrail.dto.RegisterRequest;
-import com.melina.jobtrail.dto.UserDto;
+import com.melina.jobtrail.dto.UserResponse;
 import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.service.UserService;
 import com.melina.jobtrail.util.JwtUtil;
@@ -24,8 +24,8 @@ public class AuthController {
     private final JwtUtil jwtUtil;
 
     @PostMapping("/register")
-    public ResponseEntity<UserDto> register(@Valid @RequestBody RegisterRequest registerRequest) {
-        UserDto user = userService.createUser(registerRequest);
+    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        UserResponse user = userService.createUser(registerRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
 
@@ -42,8 +42,8 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<UserDto> getMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        UserDto user = userService.getMe(userDetails.email());
+    public ResponseEntity<UserResponse> getMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        UserResponse user = userService.getMe(userDetails.email());
         return ResponseEntity.ok(user);
     }
 }

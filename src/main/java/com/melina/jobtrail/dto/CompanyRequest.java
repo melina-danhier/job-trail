@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.hibernate.validator.constraints.URL;
 
-public record RequestCompanyDto(
+public record CompanyRequest(
         @NotBlank(message = "Company name cannot be null or blank")
         @Size(max = 255, message = "Company name must not exceed 255 characters")
         String name,

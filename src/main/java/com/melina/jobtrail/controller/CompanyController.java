@@ -1,7 +1,7 @@
 package com.melina.jobtrail.controller;
 
-import com.melina.jobtrail.dto.CompanyDto;
-import com.melina.jobtrail.dto.RequestCompanyDto;
+import com.melina.jobtrail.dto.CompanyRequest;
+import com.melina.jobtrail.dto.CompanyResponse;
 import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.service.CompanyService;
 import jakarta.validation.Valid;
@@ -20,38 +20,38 @@ public class CompanyController {
     private final CompanyService companyService;
 
     @PostMapping
-    public ResponseEntity<CompanyDto> createCompany(
+    public ResponseEntity<CompanyResponse> createCompany(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Valid @RequestBody RequestCompanyDto requestDto
+            @Valid @RequestBody CompanyRequest requestDto
     ) {
-        CompanyDto dto = companyService.createCompany(userDetails.email(), requestDto);
+        CompanyResponse dto = companyService.createCompany(userDetails.email(), requestDto);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
     @GetMapping
-    public ResponseEntity<List<CompanyDto>> getAllCompanies(
+    public ResponseEntity<List<CompanyResponse>> getAllCompanies(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        List<CompanyDto> dto = companyService.getAllCompanies(userDetails.email());
+        List<CompanyResponse> dto = companyService.getAllCompanies(userDetails.email());
         return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CompanyDto> getCompanyById(
+    public ResponseEntity<CompanyResponse> getCompanyById(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id
     ) {
-        CompanyDto dto = companyService.getCompanyById(userDetails.email(), id);
+        CompanyResponse dto = companyService.getCompanyById(userDetails.email(), id);
         return ResponseEntity.ok(dto);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CompanyDto> updateCompany(
+    public ResponseEntity<CompanyResponse> updateCompany(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id,
-            @Valid @RequestBody RequestCompanyDto requestDto
+            @Valid @RequestBody CompanyRequest requestDto
     ) {
-        CompanyDto dto = companyService.updateCompany(userDetails.email(), id, requestDto);
+        CompanyResponse dto = companyService.updateCompany(userDetails.email(), id, requestDto);
         return ResponseEntity.ok(dto);
     }
 
