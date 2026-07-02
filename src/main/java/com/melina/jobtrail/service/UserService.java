@@ -3,7 +3,9 @@ package com.melina.jobtrail.service;
 import com.melina.jobtrail.dto.RegisterRequest;
 import com.melina.jobtrail.dto.UserResponse;
 import com.melina.jobtrail.entity.User;
+import com.melina.jobtrail.entity.profile.Profile;
 import com.melina.jobtrail.exception.EmailAlreadyExistsException;
+import com.melina.jobtrail.exception.ProfileNotFoundException;
 import com.melina.jobtrail.exception.UserNotFoundException;
 import com.melina.jobtrail.mapper.UserMapper;
 import com.melina.jobtrail.repository.UserRepository;
@@ -42,12 +44,16 @@ public class UserService {
         return userMapper.toResponse(user);
     }
 
-    public UserResponse getUserByEmail(@NonNull String email) {
+    @Transactional(readOnly = true)
+    Profile getProfile(String email) {
         User user = findUserOrThrow(email);
-        return userMapper.toResponse(user);
+        if (user.getProfile() == null) {
+            throw new ProfileNotFoundException();
+        }
+        return user.getProfile();
     }
 
-    private String normalizeEmail(String email) {
+    String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 

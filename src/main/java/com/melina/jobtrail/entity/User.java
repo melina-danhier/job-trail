@@ -1,5 +1,6 @@
 package com.melina.jobtrail.entity;
 
+import com.melina.jobtrail.entity.profile.Profile;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -28,6 +29,10 @@ public class User {
 
     @Column(nullable = false)
     private Instant createdAt;
+
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "profile_id", unique = true)
+    private Profile profile;
 
     @PrePersist
     void prePersist() {

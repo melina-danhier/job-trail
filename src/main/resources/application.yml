@@ -10,5 +10,25 @@ spring:
       ddl-auto: validate
     open-in-view: false
 
+  ai:
+    retry:
+      max-attempts: 3
+      backoff:
+        initial-interval: 500ms
+        multiplier: 2
+        max-interval: 2s
+      on-client-errors: false
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        model: gpt-4o-mini
+        timeout: 30s
+        max-tokens: 700
+
+job-match:
+  rate-limit:
+    requests: ${JOB_MATCH_REQUESTS_PER_MINUTE:5}
+    window: 1m
+
 jwt:
   secret: ${JWT_SECRET}
