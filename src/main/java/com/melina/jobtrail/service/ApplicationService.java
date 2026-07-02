@@ -25,18 +25,13 @@ public class ApplicationService {
     private final UserService userService;
     private final CompanyService companyService;
 
-    public ApplicationResponse createApplication(String email, ApplicationRequest requestDto) {
+    public ApplicationResponse createApplication(String email, ApplicationRequest request) {
         User user = userService.findUserOrThrow(email);
-        Company company = companyService.findCompanyOrThrow(requestDto.companyId(), user.getId());
-
-        Application application = Application.builder()
-                        .user(user)
-                        .company(company)
-                        .positionTitle(requestDto.positionTitle())
-                        .status(ApplicationStatus.APPLIED)
-                        .applicationDate(requestDto.applicationDate())
-                        .jobUrl(requestDto.jobUrl())
-                        .build();
+        Company company = companyService.findCompanyOrThrow(request.companyId(), user.getId());
+        Application application = applicationMapper.toEntity(request);
+        application.setUser(user);
+        application.setCompany(company);
+        application.setStatus(ApplicationStatus.APPLIED);
         application = applicationRepository.save(application);
         return applicationMapper.toResponse(application);
     }

@@ -20,4 +20,6 @@ public interface ApplicationMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void updateApplication(@MappingTarget Application application, ApplicationRequest requestDto);
+
+    Application toEntity(ApplicationRequest request);
 }
