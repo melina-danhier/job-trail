@@ -99,7 +99,10 @@ class ApplicationControllerTest {
                 createApplicationDto(2L, "Backend Developer")
         );
         PageResponse<ApplicationResponse> response = new PageResponse<>(applications, 0, 20, 1, 1, true, true);
-        when(applicationService.getApplications(anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC)))
+        when(applicationService.getApplications(
+                anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
+                isNull(), isNull(), isNull(), isNull()
+        ))
                 .thenReturn(response);
 
         mockMvc.perform(get("/api/applications"))
@@ -113,7 +116,8 @@ class ApplicationControllerTest {
                 );
 
         verify(applicationService).getApplications(
-                anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC)
+                anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
+                isNull(), isNull(), isNull(), isNull()
         );
     }
 
@@ -121,7 +125,8 @@ class ApplicationControllerTest {
     void getApplications_withPaginationAndSorting_passesParametersToService() throws Exception {
         PageResponse<ApplicationResponse> response = new PageResponse<>(List.of(), 2, 5, 10, 2, false, true);
         when(applicationService.getApplications(
-                anyString(), eq(2), eq(5), eq("applicationDate"), eq(Sort.Direction.ASC)
+                anyString(), eq(2), eq(5), eq("applicationDate"), eq(Sort.Direction.ASC),
+                isNull(), isNull(), isNull(), isNull()
         )).thenReturn(response);
 
         mockMvc.perform(get("/api/applications")
@@ -132,7 +137,31 @@ class ApplicationControllerTest {
                 .andExpectAll(status().isOk(), jsonPath("$.page").value(2));
 
         verify(applicationService).getApplications(
-                anyString(), eq(2), eq(5), eq("applicationDate"), eq(Sort.Direction.ASC)
+                anyString(), eq(2), eq(5), eq("applicationDate"), eq(Sort.Direction.ASC),
+                isNull(), isNull(), isNull(), isNull()
+        );
+    }
+
+    @Test
+    void getApplications_withFilters_passesParametersToService() throws Exception {
+        PageResponse<ApplicationResponse> response = new PageResponse<>(List.of(), 0, 20, 0, 0, true, true);
+        when(applicationService.getApplications(
+                anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
+                eq(com.melina.jobtrail.util.ApplicationStatus.INTERVIEW_SCHEDULED), eq(4L),
+                eq(java.time.LocalDate.of(2026, 1, 1)), eq(java.time.LocalDate.of(2026, 6, 30))
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/applications")
+                        .param("status", "INTERVIEW_SCHEDULED")
+                        .param("companyId", "4")
+                        .param("applicationDateFrom", "2026-01-01")
+                        .param("applicationDateTo", "2026-06-30"))
+                .andExpect(status().isOk());
+
+        verify(applicationService).getApplications(
+                anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
+                eq(com.melina.jobtrail.util.ApplicationStatus.INTERVIEW_SCHEDULED), eq(4L),
+                eq(java.time.LocalDate.of(2026, 1, 1)), eq(java.time.LocalDate.of(2026, 6, 30))
         );
     }
 

@@ -18,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -45,17 +46,24 @@ public class ApplicationService {
 
     @Transactional(readOnly = true)
     public PageResponse<ApplicationResponse> getApplications(
-            String email, int page, int size, String sortBy, Sort.Direction direction
+            String email, int page, int size, String sortBy, Sort.Direction direction,
+            ApplicationStatus status, Long companyId, LocalDate applicationDateFrom, LocalDate applicationDateTo
     ) {
         if (!ALLOWED_SORT_FIELDS.contains(sortBy)) {
             throw new IllegalArgumentException(
                     "Invalid sortBy value. Allowed values: " + String.join(", ", ALLOWED_SORT_FIELDS)
             );
         }
+        if (applicationDateFrom != null && applicationDateTo != null
+                && applicationDateFrom.isAfter(applicationDateTo)) {
+            throw new IllegalArgumentException("applicationDateFrom must not be after applicationDateTo");
+        }
         User user = userService.findUserOrThrow(email);
         PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortBy).and(Sort.by("id")));
         Page<ApplicationResponse> applications = applicationRepository
-                .findAllByUserId(user.getId(), pageable)
+                .findAllFiltered(
+                        user.getId(), status, companyId, applicationDateFrom, applicationDateTo, pageable
+                )
                 .map(applicationMapper::toResponse);
         return PageResponse.from(applications);
     }

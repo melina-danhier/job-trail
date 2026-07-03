@@ -14,6 +14,7 @@ import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -109,6 +110,29 @@ class ApplicationRepositoryTest {
         assertEquals("Middle Developer", result.getContent().get(1).getPositionTitle());
     }
 
+    @Test
+    void findAllFiltered_withCombinedFilters_returnsOnlyMatchingApplications() {
+        User user = createUser("filter@example.com");
+        Company matchingCompany = createCompany(user, "Matching Company");
+        Company otherCompany = createCompany(user, "Other Company");
+        createApplication(user, matchingCompany, "Match", ApplicationStatus.ACCEPTED,
+                LocalDate.of(2026, 3, 15));
+        createApplication(user, matchingCompany, "Wrong status", ApplicationStatus.REJECTED,
+                LocalDate.of(2026, 3, 15));
+        createApplication(user, otherCompany, "Wrong company", ApplicationStatus.ACCEPTED,
+                LocalDate.of(2026, 3, 15));
+        createApplication(user, matchingCompany, "Wrong date", ApplicationStatus.ACCEPTED,
+                LocalDate.of(2025, 12, 31));
+
+        Page<Application> result = applicationRepository.findAllFiltered(
+                user.getId(), ApplicationStatus.ACCEPTED, matchingCompany.getId(),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30), PageRequest.of(0, 20)
+        );
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals("Match", result.getContent().getFirst().getPositionTitle());
+    }
+
     private User createUser(String mail) {
         User user = User.builder()
                 .email(mail)
@@ -121,18 +145,28 @@ class ApplicationRepositoryTest {
     }
 
     private Application createApplication(User user, String positionTitle) {
+        Company company = createCompany(user, "Company X");
+        return createApplication(user, company, positionTitle, ApplicationStatus.APPLIED, null);
+    }
+
+    private Company createCompany(User user, String name) {
         Company company = Company.builder()
                 .user(user)
-                .name("Company X")
+                .name(name)
                 .build();
         entityManager.persist(company);
+        return company;
+    }
 
+    private Application createApplication(
+            User user, Company company, String positionTitle, ApplicationStatus status, LocalDate applicationDate
+    ) {
         Application application = Application.builder()
                 .user(user)
                 .positionTitle(positionTitle)
                 .company(company)
-                .status(ApplicationStatus.APPLIED)
-                .applicationDate(null)
+                .status(status)
+                .applicationDate(applicationDate)
                 .jobUrl(null)
                 .build();
         entityManager.persist(application);

@@ -6,6 +6,7 @@ import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.dto.PageResponse;
 import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.service.ApplicationService;
+import com.melina.jobtrail.util.ApplicationStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -14,8 +15,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/applications")
@@ -39,10 +43,15 @@ public class ApplicationController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "DESC") Sort.Direction direction
+            @RequestParam(defaultValue = "DESC") Sort.Direction direction,
+            @RequestParam(required = false) ApplicationStatus status,
+            @RequestParam(required = false) Long companyId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate applicationDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate applicationDateTo
     ) {
         return ResponseEntity.ok(applicationService.getApplications(
-                userDetails.email(), page, size, sortBy, direction
+                userDetails.email(), page, size, sortBy, direction,
+                status, companyId, applicationDateFrom, applicationDateTo
         ));
     }
 

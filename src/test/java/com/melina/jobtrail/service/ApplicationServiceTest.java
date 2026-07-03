@@ -24,6 +24,7 @@ import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -103,12 +104,13 @@ class ApplicationServiceTest {
         when(userService.findUserOrThrow(email)).thenReturn(user);
         PageRequest pageable = PageRequest.of(1, 10, Sort.by(Sort.Direction.ASC, "positionTitle")
                 .and(Sort.by("id")));
-        when(applicationRepository.findAllByUserId(user.getId(), pageable))
+        when(applicationRepository.findAllFiltered(user.getId(), null, null, null, null, pageable))
                 .thenReturn(new PageImpl<>(applications, pageable, 11));
         when(applicationMapper.toResponse(applications.getFirst())).thenReturn(expectedResponses.getFirst());
 
         PageResponse<ApplicationResponse> response = applicationService.getApplications(
-                email, 1, 10, "positionTitle", Sort.Direction.ASC
+                email, 1, 10, "positionTitle", Sort.Direction.ASC,
+                null, null, null, null
         );
 
         assertEquals(expectedResponses, response.content());
@@ -122,9 +124,44 @@ class ApplicationServiceTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> applicationService.getApplications(
-                        "user@example.com", 0, 20, "company.password", Sort.Direction.ASC
+                        "user@example.com", 0, 20, "company.password", Sort.Direction.ASC,
+                        null, null, null, null
                 )
         );
+
+        verifyNoInteractions(userService, applicationRepository, applicationMapper);
+    }
+
+    @Test
+    void getApplications_withFilters_passesFiltersToRepository() {
+        String email = "user@example.com";
+        User user = createUser(email);
+        LocalDate from = LocalDate.of(2026, 1, 1);
+        LocalDate to = LocalDate.of(2026, 6, 30);
+        PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")
+                .and(Sort.by("id")));
+
+        when(userService.findUserOrThrow(email)).thenReturn(user);
+        when(applicationRepository.findAllFiltered(
+                user.getId(), ApplicationStatus.ACCEPTED, 3L, from, to, pageable
+        )).thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        applicationService.getApplications(
+                email, 0, 20, "createdAt", Sort.Direction.DESC,
+                ApplicationStatus.ACCEPTED, 3L, from, to
+        );
+
+        verify(applicationRepository).findAllFiltered(
+                user.getId(), ApplicationStatus.ACCEPTED, 3L, from, to, pageable
+        );
+    }
+
+    @Test
+    void getApplications_withReversedDateRange_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () -> applicationService.getApplications(
+                "user@example.com", 0, 20, "createdAt", Sort.Direction.DESC,
+                null, null, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 6, 30)
+        ));
 
         verifyNoInteractions(userService, applicationRepository, applicationMapper);
     }
