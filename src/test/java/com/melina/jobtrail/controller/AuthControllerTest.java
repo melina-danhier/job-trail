@@ -84,7 +84,7 @@ class AuthControllerTest {
 
         when(userService.createUser(any(RegisterRequest.class))).thenReturn(userResponse);
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpectAll(
@@ -101,7 +101,7 @@ class AuthControllerTest {
     void register_withInvalidPassword_shouldReturnBadRequest(String password) throws Exception {
         RegisterRequest registerRequest = new RegisterRequest("user@example.com", password);
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpectAll(
@@ -119,7 +119,7 @@ class AuthControllerTest {
     void register_withInvalidEmail_shouldReturnBadRequest(String email) throws Exception {
         RegisterRequest registerRequest = new RegisterRequest(email, "password");
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpectAll(
@@ -138,7 +138,7 @@ class AuthControllerTest {
         when(userService.createUser(any(RegisterRequest.class)))
                 .thenThrow(new EmailAlreadyExistsException(registerRequest.email()));
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isConflict());
@@ -152,7 +152,7 @@ class AuthControllerTest {
 
         when(jwtUtil.generateToken(loginRequest.email())).thenReturn("signed-jwt");
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpectAll(
@@ -175,7 +175,7 @@ class AuthControllerTest {
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenThrow(new BadCredentialsException("Bad credentials"));
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isUnauthorized());
@@ -188,7 +188,7 @@ class AuthControllerTest {
         UserResponse userResponse = new UserResponse("user@example.com", Instant.parse("2026-06-24T12:00:00Z"));
         when(userService.getMe("user@example.com")).thenReturn(userResponse);
 
-        mockMvc.perform(get("/auth/me"))
+        mockMvc.perform(get("/api/auth/me"))
                 .andExpectAll(
                         status().isOk(),
                         jsonPath("$.email").value("user@example.com"),
