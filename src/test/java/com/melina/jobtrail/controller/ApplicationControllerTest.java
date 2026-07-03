@@ -4,6 +4,7 @@ package com.melina.jobtrail.controller;
 import com.melina.jobtrail.dto.application.ApplicationRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
 import com.melina.jobtrail.dto.CompanyResponse;
+import com.melina.jobtrail.dto.PageResponse;
 import com.melina.jobtrail.exception.ApplicationNotFoundException;
 import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.security.JwtAuthFilter;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -96,16 +98,58 @@ class ApplicationControllerTest {
         List<ApplicationResponse> applications = List.of(
                 createApplicationDto(2L, "Backend Developer")
         );
-        when(applicationService.getApplications(any(String.class)))
-                .thenReturn(applications);
+        PageResponse<ApplicationResponse> response = new PageResponse<>(applications, 0, 20, 1, 1, true, true);
+        when(applicationService.getApplications(anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC)))
+                .thenReturn(response);
 
         mockMvc.perform(get("/api/applications"))
                 .andExpectAll(
                         status().isOk(),
-                        jsonPath("$").isNotEmpty()
+                        jsonPath("$.content[0].positionTitle").value("Backend Developer"),
+                        jsonPath("$.page").value(0),
+                        jsonPath("$.size").value(20),
+                        jsonPath("$.totalElements").value(1),
+                        jsonPath("$.last").value(true)
                 );
 
-        verify(applicationService).getApplications(any(String.class));
+        verify(applicationService).getApplications(
+                anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC)
+        );
+    }
+
+    @Test
+    void getApplications_withPaginationAndSorting_passesParametersToService() throws Exception {
+        PageResponse<ApplicationResponse> response = new PageResponse<>(List.of(), 2, 5, 10, 2, false, true);
+        when(applicationService.getApplications(
+                anyString(), eq(2), eq(5), eq("applicationDate"), eq(Sort.Direction.ASC)
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/applications")
+                        .param("page", "2")
+                        .param("size", "5")
+                        .param("sortBy", "applicationDate")
+                        .param("direction", "ASC"))
+                .andExpectAll(status().isOk(), jsonPath("$.page").value(2));
+
+        verify(applicationService).getApplications(
+                anyString(), eq(2), eq(5), eq("applicationDate"), eq(Sort.Direction.ASC)
+        );
+    }
+
+    @Test
+    void getApplications_withOversizedPage_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/applications").param("size", "101"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void getApplications_withInvalidDirection_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/applications").param("direction", "SIDEWAYS"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(applicationService);
     }
 
     @Test

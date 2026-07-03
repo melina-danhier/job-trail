@@ -8,6 +8,9 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Optional;
@@ -87,6 +90,23 @@ class ApplicationRepositoryTest {
         List<Application> applications = applicationRepository.findAllByUserId(10L);
 
         assertTrue(applications.isEmpty());
+    }
+
+    @Test
+    void findAllByUserId_withPageable_returnsRequestedSortedPage() {
+        User user = createUser("page@example.com");
+        createApplication(user, "Zulu Developer");
+        createApplication(user, "Alpha Developer");
+        createApplication(user, "Middle Developer");
+
+        Page<Application> result = applicationRepository.findAllByUserId(
+                user.getId(), PageRequest.of(0, 2, Sort.by("positionTitle").ascending())
+        );
+
+        assertEquals(2, result.getContent().size());
+        assertEquals(3, result.getTotalElements());
+        assertEquals("Alpha Developer", result.getContent().getFirst().getPositionTitle());
+        assertEquals("Middle Developer", result.getContent().get(1).getPositionTitle());
     }
 
     private User createUser(String mail) {

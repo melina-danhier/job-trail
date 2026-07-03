@@ -3,6 +3,7 @@ package com.melina.jobtrail.service;
 import com.melina.jobtrail.dto.application.ApplicationRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
+import com.melina.jobtrail.dto.PageResponse;
 import com.melina.jobtrail.entity.Application;
 import com.melina.jobtrail.entity.Company;
 import com.melina.jobtrail.entity.User;
@@ -13,6 +14,9 @@ import com.melina.jobtrail.util.ApplicationStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
@@ -20,6 +24,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional
 public class ApplicationService {
+    private static final List<String> ALLOWED_SORT_FIELDS = List.of(
+            "createdAt", "updatedAt", "applicationDate", "positionTitle", "status"
+    );
     private final ApplicationRepository applicationRepository;
     private final ApplicationMapper applicationMapper;
     private final UserService userService;
@@ -36,10 +43,21 @@ public class ApplicationService {
         return applicationMapper.toResponse(application);
     }
 
-    public List<ApplicationResponse> getApplications(String email) {
+    @Transactional(readOnly = true)
+    public PageResponse<ApplicationResponse> getApplications(
+            String email, int page, int size, String sortBy, Sort.Direction direction
+    ) {
+        if (!ALLOWED_SORT_FIELDS.contains(sortBy)) {
+            throw new IllegalArgumentException(
+                    "Invalid sortBy value. Allowed values: " + String.join(", ", ALLOWED_SORT_FIELDS)
+            );
+        }
         User user = userService.findUserOrThrow(email);
-        List<Application> applications = applicationRepository.findAllByUserId(user.getId());
-        return applicationMapper.toResponseList(applications);
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortBy).and(Sort.by("id")));
+        Page<ApplicationResponse> applications = applicationRepository
+                .findAllByUserId(user.getId(), pageable)
+                .map(applicationMapper::toResponse);
+        return PageResponse.from(applications);
     }
 
     public ApplicationResponse getApplicationById(String email, long id) {

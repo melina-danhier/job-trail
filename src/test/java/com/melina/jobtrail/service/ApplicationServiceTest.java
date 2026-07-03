@@ -4,6 +4,7 @@ package com.melina.jobtrail.service;
 import com.melina.jobtrail.dto.application.ApplicationRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
+import com.melina.jobtrail.dto.PageResponse;
 import com.melina.jobtrail.entity.Application;
 import com.melina.jobtrail.entity.Company;
 import com.melina.jobtrail.entity.User;
@@ -17,6 +18,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Optional;
@@ -97,12 +101,32 @@ class ApplicationServiceTest {
         );
 
         when(userService.findUserOrThrow(email)).thenReturn(user);
-        when(applicationRepository.findAllByUserId(user.getId())).thenReturn(applications);
-        when(applicationMapper.toResponseList(applications)).thenReturn(expectedResponses);
+        PageRequest pageable = PageRequest.of(1, 10, Sort.by(Sort.Direction.ASC, "positionTitle")
+                .and(Sort.by("id")));
+        when(applicationRepository.findAllByUserId(user.getId(), pageable))
+                .thenReturn(new PageImpl<>(applications, pageable, 11));
+        when(applicationMapper.toResponse(applications.getFirst())).thenReturn(expectedResponses.getFirst());
 
-        List<ApplicationResponse> responses = applicationService.getApplications(email);
+        PageResponse<ApplicationResponse> response = applicationService.getApplications(
+                email, 1, 10, "positionTitle", Sort.Direction.ASC
+        );
 
-        assertEquals(expectedResponses, responses);
+        assertEquals(expectedResponses, response.content());
+        assertEquals(1, response.page());
+        assertEquals(2, response.totalPages());
+        assertEquals(11, response.totalElements());
+    }
+
+    @Test
+    void getApplications_withInvalidSortField_throwsIllegalArgumentException() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> applicationService.getApplications(
+                        "user@example.com", 0, 20, "company.password", Sort.Direction.ASC
+                )
+        );
+
+        verifyNoInteractions(userService, applicationRepository, applicationMapper);
     }
 
     @Test
