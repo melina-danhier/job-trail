@@ -4,8 +4,10 @@ package com.melina.jobtrail.service;
 import com.melina.jobtrail.dto.application.ApplicationRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
+import com.melina.jobtrail.dto.application.ApplicationStatusHistoryResponse;
 import com.melina.jobtrail.dto.PageResponse;
 import com.melina.jobtrail.entity.Application;
+import com.melina.jobtrail.entity.ApplicationStatusHistory;
 import com.melina.jobtrail.entity.Company;
 import com.melina.jobtrail.entity.User;
 import com.melina.jobtrail.exception.ApplicationNotFoundException;
@@ -17,6 +19,7 @@ import com.melina.jobtrail.util.ApplicationStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -26,6 +29,7 @@ import org.springframework.data.domain.Sort;
 import java.util.List;
 import java.util.Optional;
 import java.time.LocalDate;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -140,7 +144,7 @@ class ApplicationServiceTest {
     }
 
     @Test
-    void getApplications_withFilters_passesFiltersToRepository() {
+    void getApplications_withCombinedFilters_returnsMatchingApplications() {
         String email = "user@example.com";
         User user = createUser(email);
         LocalDate from = LocalDate.of(2026, 1, 1);
@@ -279,6 +283,75 @@ class ApplicationServiceTest {
     }
 
     @Test
+    void updateApplicationStatus_withChangedStatus_recordsCompleteTransition() {
+        String email = "user@example.com";
+        User user = createUser(email);
+        Application application = createApplication(1L, "Software Engineer");
+        application.setStatus(ApplicationStatus.APPLIED);
+        ApplicationUpdateStatusRequest request = new ApplicationUpdateStatusRequest(ApplicationStatus.ACCEPTED);
+
+        when(userService.findUserOrThrow(email)).thenReturn(user);
+        when(applicationRepository.findByIdAndUserId(application.getId(), user.getId()))
+                .thenReturn(Optional.of(application));
+        when(applicationRepository.save(application)).thenReturn(application);
+
+        applicationService.updateApplicationStatus(email, application.getId(), request);
+
+        ArgumentCaptor<ApplicationStatusHistory> historyCaptor =
+                ArgumentCaptor.forClass(ApplicationStatusHistory.class);
+        verify(statusHistoryRepository).save(historyCaptor.capture());
+        ApplicationStatusHistory savedHistory = historyCaptor.getValue();
+        assertSame(application, savedHistory.getApplication());
+        assertEquals(ApplicationStatus.APPLIED, savedHistory.getPreviousStatus());
+        assertEquals(ApplicationStatus.ACCEPTED, savedHistory.getNewStatus());
+    }
+
+    @Test
+    void getStatusHistory_returnsEntriesInRepositoryOrder() {
+        String email = "user@example.com";
+        User user = createUser(email);
+        Application application = createApplication(1L, "Software Engineer");
+        Instant firstChange = Instant.parse("2026-01-10T10:00:00Z");
+        Instant secondChange = Instant.parse("2026-01-11T10:00:00Z");
+        List<ApplicationStatusHistory> history = List.of(
+                ApplicationStatusHistory.builder().id(10L).application(application)
+                        .newStatus(ApplicationStatus.SAVED).changedAt(firstChange).build(),
+                ApplicationStatusHistory.builder().id(11L).application(application)
+                        .previousStatus(ApplicationStatus.SAVED).newStatus(ApplicationStatus.APPLIED)
+                        .changedAt(secondChange).build()
+        );
+
+        when(userService.findUserOrThrow(email)).thenReturn(user);
+        when(applicationRepository.findByIdAndUserId(application.getId(), user.getId()))
+                .thenReturn(Optional.of(application));
+        when(statusHistoryRepository.findAllByApplicationIdOrderByChangedAtAscIdAsc(application.getId()))
+                .thenReturn(history);
+
+        List<ApplicationStatusHistoryResponse> result =
+                applicationService.getStatusHistory(email, application.getId());
+
+        assertEquals(List.of(
+                new ApplicationStatusHistoryResponse(10L, null, ApplicationStatus.SAVED, firstChange),
+                new ApplicationStatusHistoryResponse(
+                        11L, ApplicationStatus.SAVED, ApplicationStatus.APPLIED, secondChange
+                )
+        ), result);
+    }
+
+    @Test
+    void getStatusHistory_forInaccessibleApplication_isRejected() {
+        String email = "user@example.com";
+        User user = createUser(email);
+        when(userService.findUserOrThrow(email)).thenReturn(user);
+        when(applicationRepository.findByIdAndUserId(99L, user.getId())).thenReturn(Optional.empty());
+
+        assertThrows(ApplicationNotFoundException.class,
+                () -> applicationService.getStatusHistory(email, 99L));
+
+        verifyNoInteractions(statusHistoryRepository);
+    }
+
+    @Test
     void deleteApplication_withValidId_deletesApplication() {
         String email = "user@example.com";
         User user = createUser(email);
@@ -291,6 +364,59 @@ class ApplicationServiceTest {
         applicationService.deleteApplication(email, application.getId());
 
         verify(applicationRepository).delete(application);
+    }
+
+    @Test
+    void updateApplication_ownedByAnotherUser_isRejectedWithoutChanges() {
+        String email = "other@example.com";
+        User otherUser = createUser(email);
+        otherUser.setId(2L);
+        ApplicationRequest request = createApplicationRequest("Changed title");
+
+        when(userService.findUserOrThrow(email)).thenReturn(otherUser);
+        when(applicationRepository.findByIdAndUserId(1L, otherUser.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(ApplicationNotFoundException.class,
+                () -> applicationService.updateApplication(email, 1L, request));
+
+        verify(applicationRepository, never()).save(any());
+        verifyNoInteractions(companyService, applicationMapper);
+    }
+
+    @Test
+    void updateStatus_ofApplicationOwnedByAnotherUser_isRejectedWithoutHistory() {
+        String email = "other@example.com";
+        User otherUser = createUser(email);
+        otherUser.setId(2L);
+        ApplicationUpdateStatusRequest request =
+                new ApplicationUpdateStatusRequest(ApplicationStatus.ACCEPTED);
+
+        when(userService.findUserOrThrow(email)).thenReturn(otherUser);
+        when(applicationRepository.findByIdAndUserId(1L, otherUser.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(ApplicationNotFoundException.class,
+                () -> applicationService.updateApplicationStatus(email, 1L, request));
+
+        verify(applicationRepository, never()).save(any());
+        verifyNoInteractions(statusHistoryRepository, applicationMapper);
+    }
+
+    @Test
+    void deleteApplication_ownedByAnotherUser_isRejectedWithoutDeletion() {
+        String email = "other@example.com";
+        User otherUser = createUser(email);
+        otherUser.setId(2L);
+
+        when(userService.findUserOrThrow(email)).thenReturn(otherUser);
+        when(applicationRepository.findByIdAndUserId(1L, otherUser.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(ApplicationNotFoundException.class,
+                () -> applicationService.deleteApplication(email, 1L));
+
+        verify(applicationRepository, never()).delete(any());
     }
 
     private ApplicationRequest createApplicationRequest(String positionTitle) {

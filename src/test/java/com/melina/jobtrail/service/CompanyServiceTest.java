@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -142,6 +143,40 @@ class CompanyServiceTest {
         companyService.deleteCompany(email, company.getId());
 
         verify(companyRepository).delete(company);
+    }
+
+    @Test
+    void updateCompany_ownedByAnotherUser_isRejectedWithoutChanges() {
+        String email = "other@example.com";
+        User otherUser = createUser(email);
+        otherUser.setId(2L);
+        CompanyRequest request = createRequest("Changed company");
+
+        when(userService.findUserOrThrow(email)).thenReturn(otherUser);
+        when(companyRepository.findByIdAndUserId(1L, otherUser.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(CompanyNotFoundException.class,
+                () -> companyService.updateCompany(email, 1L, request));
+
+        verify(companyRepository, never()).save(any());
+        verifyNoInteractions(companyMapper);
+    }
+
+    @Test
+    void deleteCompany_ownedByAnotherUser_isRejectedWithoutDeletion() {
+        String email = "other@example.com";
+        User otherUser = createUser(email);
+        otherUser.setId(2L);
+
+        when(userService.findUserOrThrow(email)).thenReturn(otherUser);
+        when(companyRepository.findByIdAndUserId(1L, otherUser.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(CompanyNotFoundException.class,
+                () -> companyService.deleteCompany(email, 1L));
+
+        verify(companyRepository, never()).delete(any());
     }
 
     private CompanyRequest createRequest(String name) {

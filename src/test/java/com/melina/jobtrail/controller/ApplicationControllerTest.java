@@ -3,6 +3,8 @@ package com.melina.jobtrail.controller;
 
 import com.melina.jobtrail.dto.application.ApplicationRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
+import com.melina.jobtrail.dto.application.ApplicationStatusHistoryResponse;
+import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.dto.CompanyResponse;
 import com.melina.jobtrail.dto.PageResponse;
 import com.melina.jobtrail.exception.ApplicationNotFoundException;
@@ -24,6 +26,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.time.Instant;
+
+import com.melina.jobtrail.util.ApplicationStatus;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -122,7 +127,7 @@ class ApplicationControllerTest {
     }
 
     @Test
-    void getApplications_withPaginationAndSorting_passesParametersToService() throws Exception {
+    void getApplications_withPaginationAndSorting_returnsRequestedPage() throws Exception {
         PageResponse<ApplicationResponse> response = new PageResponse<>(List.of(), 2, 5, 10, 2, false, true);
         when(applicationService.getApplications(
                 anyString(), eq(2), eq(5), eq("applicationDate"), eq(Sort.Direction.ASC),
@@ -143,7 +148,7 @@ class ApplicationControllerTest {
     }
 
     @Test
-    void getApplications_withFilters_passesParametersToService() throws Exception {
+    void getApplications_withCombinedFilters_returnsMatchingPage() throws Exception {
         PageResponse<ApplicationResponse> response = new PageResponse<>(List.of(), 0, 20, 0, 0, true, true);
         when(applicationService.getApplications(
                 anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
@@ -249,6 +254,60 @@ class ApplicationControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void updateApplicationStatus_withValidStatus_returnsUpdatedApplication() throws Exception {
+        ApplicationUpdateStatusRequest request =
+                new ApplicationUpdateStatusRequest(ApplicationStatus.INTERVIEW_SCHEDULED);
+        ApplicationResponse response = createApplicationDto(6L, "Software Developer");
+        when(applicationService.updateApplicationStatus(anyString(), eq(6L), eq(request))).thenReturn(response);
+
+        mockMvc.perform(patch("/api/applications/{id}/status", 6L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpectAll(
+                        status().isOk(),
+                        jsonPath("$.id").value(6L),
+                        jsonPath("$.positionTitle").value("Software Developer")
+                );
+
+        verify(applicationService).updateApplicationStatus("user@example.com", 6L, request);
+    }
+
+    @Test
+    void updateApplicationStatus_withMissingStatus_returnsBadRequest() throws Exception {
+        mockMvc.perform(patch("/api/applications/{id}/status", 6L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.fieldErrors.status").value("Status cannot be null")
+                );
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void getStatusHistory_returnsStatusTransitions() throws Exception {
+        Instant changedAt = Instant.parse("2026-02-01T09:30:00Z");
+        List<ApplicationStatusHistoryResponse> history = List.of(
+                new ApplicationStatusHistoryResponse(
+                        12L, ApplicationStatus.SAVED, ApplicationStatus.APPLIED, changedAt
+                )
+        );
+        when(applicationService.getStatusHistory("user@example.com", 7L)).thenReturn(history);
+
+        mockMvc.perform(get("/api/applications/{id}/status-history", 7L))
+                .andExpectAll(
+                        status().isOk(),
+                        jsonPath("$[0].id").value(12L),
+                        jsonPath("$[0].previousStatus").value("SAVED"),
+                        jsonPath("$[0].newStatus").value("APPLIED"),
+                        jsonPath("$[0].changedAt").value("2026-02-01T09:30:00Z")
+                );
+
+        verify(applicationService).getStatusHistory("user@example.com", 7L);
     }
 
     @Test
