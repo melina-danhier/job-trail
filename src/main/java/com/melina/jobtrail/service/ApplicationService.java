@@ -3,13 +3,16 @@ package com.melina.jobtrail.service;
 import com.melina.jobtrail.dto.application.ApplicationRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
+import com.melina.jobtrail.dto.application.ApplicationStatusHistoryResponse;
 import com.melina.jobtrail.dto.PageResponse;
 import com.melina.jobtrail.entity.Application;
+import com.melina.jobtrail.entity.ApplicationStatusHistory;
 import com.melina.jobtrail.entity.Company;
 import com.melina.jobtrail.entity.User;
 import com.melina.jobtrail.exception.ApplicationNotFoundException;
 import com.melina.jobtrail.mapper.ApplicationMapper;
 import com.melina.jobtrail.repository.ApplicationRepository;
+import com.melina.jobtrail.repository.ApplicationStatusHistoryRepository;
 import com.melina.jobtrail.util.ApplicationStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,6 +32,7 @@ public class ApplicationService {
             "createdAt", "updatedAt", "applicationDate", "positionTitle", "status"
     );
     private final ApplicationRepository applicationRepository;
+    private final ApplicationStatusHistoryRepository statusHistoryRepository;
     private final ApplicationMapper applicationMapper;
     private final UserService userService;
     private final CompanyService companyService;
@@ -39,8 +43,9 @@ public class ApplicationService {
         Application application = applicationMapper.toEntity(request);
         application.setUser(user);
         application.setCompany(company);
-        application.setStatus(ApplicationStatus.APPLIED);
+        application.setStatus(ApplicationStatus.SAVED);
         application = applicationRepository.save(application);
+        saveStatusChange(application, null, ApplicationStatus.SAVED);
         return applicationMapper.toResponse(application);
     }
 
@@ -88,9 +93,35 @@ public class ApplicationService {
 
     public ApplicationResponse updateApplicationStatus(String email, long id, ApplicationUpdateStatusRequest requestDto) {
         Application application = findApplicationOrThrow(id, userService.findUserOrThrow(email).getId());
+        ApplicationStatus previousStatus = application.getStatus();
+        if (previousStatus == requestDto.status()) {
+            return applicationMapper.toResponse(application);
+        }
         application.setStatus(requestDto.status());
         application = applicationRepository.save(application);
+        saveStatusChange(application, previousStatus, requestDto.status());
         return applicationMapper.toResponse(application);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ApplicationStatusHistoryResponse> getStatusHistory(String email, long id) {
+        Application application = findApplicationOrThrow(id, userService.findUserOrThrow(email).getId());
+        return statusHistoryRepository.findAllByApplicationIdOrderByChangedAtAscIdAsc(application.getId())
+                .stream()
+                .map(entry -> new ApplicationStatusHistoryResponse(
+                        entry.getId(), entry.getPreviousStatus(), entry.getNewStatus(), entry.getChangedAt()
+                ))
+                .toList();
+    }
+
+    private void saveStatusChange(
+            Application application, ApplicationStatus previousStatus, ApplicationStatus newStatus
+    ) {
+        statusHistoryRepository.save(ApplicationStatusHistory.builder()
+                .application(application)
+                .previousStatus(previousStatus)
+                .newStatus(newStatus)
+                .build());
     }
 
     public void deleteApplication(String email, long id) {

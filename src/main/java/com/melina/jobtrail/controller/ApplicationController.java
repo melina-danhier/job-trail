@@ -3,6 +3,7 @@ package com.melina.jobtrail.controller;
 import com.melina.jobtrail.dto.application.ApplicationRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
+import com.melina.jobtrail.dto.application.ApplicationStatusHistoryResponse;
 import com.melina.jobtrail.dto.PageResponse;
 import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.service.ApplicationService;
@@ -20,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/applications")
@@ -82,6 +84,14 @@ public class ApplicationController {
     ) {
         ApplicationResponse dto = applicationService.updateApplicationStatus(userDetails.email(),id,requestDto);
         return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/{id}/status-history")
+    public ResponseEntity<List<ApplicationStatusHistoryResponse>> getStatusHistory(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable long id
+    ) {
+        return ResponseEntity.ok(applicationService.getStatusHistory(userDetails.email(), id));
     }
 
     @DeleteMapping("/{id}")

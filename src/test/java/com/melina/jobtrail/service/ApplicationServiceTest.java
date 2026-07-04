@@ -12,6 +12,7 @@ import com.melina.jobtrail.exception.ApplicationNotFoundException;
 import com.melina.jobtrail.exception.CompanyNotFoundException;
 import com.melina.jobtrail.mapper.ApplicationMapper;
 import com.melina.jobtrail.repository.ApplicationRepository;
+import com.melina.jobtrail.repository.ApplicationStatusHistoryRepository;
 import com.melina.jobtrail.util.ApplicationStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +30,9 @@ import java.time.LocalDate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +44,9 @@ class ApplicationServiceTest {
 
     @Mock
     private ApplicationRepository applicationRepository;
+
+    @Mock
+    private ApplicationStatusHistoryRepository statusHistoryRepository;
 
     @Mock
     private ApplicationMapper applicationMapper;
@@ -71,8 +77,9 @@ class ApplicationServiceTest {
         assertEquals(expectedResponse, response);
         assertSame(user, application.getUser());
         assertSame(company, application.getCompany());
-        assertEquals(ApplicationStatus.APPLIED, application.getStatus());
+        assertEquals(ApplicationStatus.SAVED, application.getStatus());
         verify(applicationRepository).save(application);
+        verify(statusHistoryRepository).save(any());
     }
 
     @Test
@@ -226,6 +233,26 @@ class ApplicationServiceTest {
     }
 
     @Test
+    void updateApplicationStatus_withSameStatus_doesNotCreateHistoryEntry() {
+        String email = "user@example.com";
+        User user = createUser(email);
+        Application application = createApplication(1L, "Software Engineer");
+        application.setStatus(ApplicationStatus.SAVED);
+        ApplicationUpdateStatusRequest request = new ApplicationUpdateStatusRequest(ApplicationStatus.SAVED);
+        ApplicationResponse expectedResponse = createApplicationResponse(1L, "Software Engineer");
+
+        when(userService.findUserOrThrow(email)).thenReturn(user);
+        when(applicationRepository.findByIdAndUserId(application.getId(), user.getId()))
+                .thenReturn(Optional.of(application));
+        when(applicationMapper.toResponse(application)).thenReturn(expectedResponse);
+
+        assertEquals(expectedResponse, applicationService.updateApplicationStatus(email, application.getId(), request));
+
+        verify(applicationRepository, never()).save(any());
+        verify(statusHistoryRepository, never()).save(any());
+    }
+
+    @Test
     void updateApplicationStatus_withValidRequest_returnsApplicationResponse() {
         String email = "user@example.com";
         User user = createUser(email);
@@ -248,6 +275,7 @@ class ApplicationServiceTest {
         assertEquals(expectedResponse, response);
         assertEquals(ApplicationStatus.INTERVIEW_SCHEDULED, application.getStatus());
         verify(applicationRepository).save(application);
+        verify(statusHistoryRepository).save(any());
     }
 
     @Test
