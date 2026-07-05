@@ -10,6 +10,7 @@ import com.melina.jobtrail.entity.ApplicationStatusHistory;
 import com.melina.jobtrail.entity.Company;
 import com.melina.jobtrail.entity.User;
 import com.melina.jobtrail.exception.ApplicationNotFoundException;
+import com.melina.jobtrail.exception.DuplicateApplicationException;
 import com.melina.jobtrail.mapper.ApplicationMapper;
 import com.melina.jobtrail.repository.ApplicationRepository;
 import com.melina.jobtrail.repository.ApplicationStatusHistoryRepository;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -40,11 +42,12 @@ public class ApplicationService {
     public ApplicationResponse createApplication(String email, ApplicationRequest request) {
         User user = userService.findUserOrThrow(email);
         Company company = companyService.findCompanyOrThrow(request.companyId(), user.getId());
+        rejectDuplicate(user.getId(), company.getId(), request.positionTitle());
         Application application = applicationMapper.toEntity(request);
         application.setUser(user);
         application.setCompany(company);
         application.setStatus(ApplicationStatus.SAVED);
-        application = applicationRepository.save(application);
+        application = saveOrRejectDuplicate(application);
         saveStatusChange(application, null, ApplicationStatus.SAVED);
         return applicationMapper.toResponse(application);
     }
@@ -85,9 +88,10 @@ public class ApplicationService {
         User user = userService.findUserOrThrow(email);
         Application application = findApplicationOrThrow(id, user.getId());
         Company company = companyService.findCompanyOrThrow(requestDto.companyId(), user.getId());
+        rejectDuplicate(user.getId(), company.getId(), requestDto.positionTitle(), application.getId());
         applicationMapper.updateApplication(application, requestDto);
         application.setCompany(company);
-        application = applicationRepository.save(application);
+        application = saveOrRejectDuplicate(application);
         return applicationMapper.toResponse(application);
     }
 
@@ -133,5 +137,30 @@ public class ApplicationService {
     Application findApplicationOrThrow(long id, long userId) {
         return applicationRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ApplicationNotFoundException(id));
+    }
+
+    private void rejectDuplicate(long userId, long companyId, String positionTitle) {
+        if (applicationRepository.existsByUserIdAndCompanyIdAndPositionTitle(userId, companyId, positionTitle)) {
+            throw new DuplicateApplicationException();
+        }
+    }
+
+    private void rejectDuplicate(long userId, long companyId, String positionTitle, long applicationId) {
+        if (applicationRepository.existsByUserIdAndCompanyIdAndPositionTitleAndIdNot(
+                userId, companyId, positionTitle, applicationId
+        )) {
+            throw new DuplicateApplicationException();
+        }
+    }
+
+    private Application saveOrRejectDuplicate(Application application) {
+        try {
+            // Flush here so a concurrent duplicate is translated inside the service boundary.
+            Application savedApplication = applicationRepository.save(application);
+            applicationRepository.flush();
+            return savedApplication;
+        } catch (DataIntegrityViolationException ex) {
+            throw new DuplicateApplicationException();
+        }
     }
 }

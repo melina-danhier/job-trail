@@ -180,6 +180,41 @@ class ApplicationApiIntegrationTest {
         assertNotFound(authenticated(get("/api/applications/{id}", 999_999L), ownerAuthentication), 999_999L);
     }
 
+    @Test
+    void sameUser_cannotCreateSameCompanyAndPositionTwice() throws Exception {
+        createApplication("Backend Developer");
+
+        ApplicationRequest duplicate = new ApplicationRequest(
+                "Backend Developer", ownerCompany.getId(), ApplicationStatus.SAVED, null, null
+        );
+        mockMvc.perform(json(authenticated(post("/api/applications"), ownerAuthentication), duplicate))
+                .andExpectAll(
+                        status().isConflict(),
+                        jsonPath("$.status").value(409),
+                        jsonPath("$.error").value("Conflict"),
+                        jsonPath("$.message")
+                                .value("An application for this company and position already exists"),
+                        jsonPath("$.timestamp", matchesPattern(".+Z"))
+                );
+    }
+
+    @Test
+    void differentUser_canCreateSameCompanyNameAndPosition() throws Exception {
+        createApplication("Backend Developer");
+        User other = userRepository.findByEmail(OTHER_EMAIL).orElseThrow();
+        Company otherCompany = companyRepository.save(Company.builder().user(other).name("Acme").build());
+        ApplicationRequest request = new ApplicationRequest(
+                "Backend Developer", otherCompany.getId(), ApplicationStatus.SAVED, null, null
+        );
+
+        mockMvc.perform(json(authenticated(post("/api/applications"), otherAuthentication), request))
+                .andExpectAll(
+                        status().isCreated(),
+                        jsonPath("$.positionTitle").value("Backend Developer"),
+                        jsonPath("$.company.name").value("Acme")
+                );
+    }
+
     private User saveUser(String email) {
         return userRepository.save(User.builder()
                 .email(email)
