@@ -16,6 +16,10 @@ import java.util.Optional;
 @Repository
 public interface ApplicationRepository extends JpaRepository<Application, Long> {
     Optional<Application> findByIdAndUserId(long id, long userId);
+    boolean existsByUserIdAndCompanyIdAndPositionTitle(long userId, long companyId, String positionTitle);
+    boolean existsByUserIdAndCompanyIdAndPositionTitleAndIdNot(
+            long userId, long companyId, String positionTitle, long id
+    );
     List<Application> findAllByUserId(long id);
     Page<Application> findAllByUserId(long userId, Pageable pageable);
 

@@ -84,6 +84,11 @@ public class GlobalExceptionHandler {
         return createErrorResponseEntity(HttpStatus.NOT_FOUND,ex.getMessage());
     }
 
+    @ExceptionHandler(DuplicateApplicationException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateApplicationException(DuplicateApplicationException ex) {
+        return createErrorResponseEntity(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     @ExceptionHandler(CompanyNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleCompanyNotFoundException(CompanyNotFoundException ex) {
         return createErrorResponseEntity(HttpStatus.NOT_FOUND,ex.getMessage());
