@@ -1,5 +1,15 @@
 # JobTrail
 
+[![CI](https://github.com/melina-danhier/job-trail/actions/workflows/ci.yml/badge.svg)](https://github.com/melina-danhier/job-trail/actions/workflows/ci.yml)
+![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
+
+**Eine produktionsnah aufgebaute REST-API, die Bewerbungen benutzerspezifisch verwaltet,
+Statusverläufe nachvollziehbar macht und Stellenbeschreibungen optional per KI mit dem eigenen
+Profil abgleicht.**
+
 JobTrail ist eine REST-API, mit der Benutzer Firmen und Bewerbungen verwalten, Statusänderungen
 nachverfolgen und ein eigenes Bewerbungsprofil pflegen können. Der wichtigste Use Case ist ein
 persönlicher Bewerbungstracker: Firma anlegen, Bewerbung erfassen und ihren Weg von `SAVED` bis
@@ -32,6 +42,17 @@ Die Anwendung folgt einer klassischen Schichtung: Controller validieren HTTP-Anf
 enthalten Fachlogik und Transaktionen, Repositories kapseln JPA-Zugriffe und Mapper trennen DTOs
 von Entities. Jede Firma, Bewerbung und jedes Profil ist einem Benutzer zugeordnet. Flyway ist
 Eigentümer des Schemas; Hibernate läuft mit `ddl-auto: validate` und verändert es nicht selbst.
+
+```mermaid
+flowchart LR
+    Client["API client / Swagger UI"] --> Security["Spring Security + JWT"]
+    Security --> Controller["REST controllers"]
+    Controller --> Service["Business services"]
+    Service --> Repository["Spring Data repositories"]
+    Repository --> Database[(PostgreSQL)]
+    Service --> OpenAI["OpenAI API (optional)"]
+    Flyway["Flyway migrations"] --> Database
+```
 
 ## Voraussetzungen
 
@@ -80,6 +101,11 @@ Eine globale Maven-Installation ist nicht nötig. Unter Windows wird `mvnw.cmd`,
    Die API ist anschließend unter `http://localhost:8080` erreichbar. Beenden mit `Ctrl+C`, die
    Datenbank mit `docker compose down`. `docker compose down -v` entfernt zusätzlich alle lokalen
    JobTrail-Daten.
+
+Die interaktive OpenAPI-Dokumentation ist unter
+`http://localhost:8080/swagger-ui/index.html` verfügbar. Registrierung und Login können dort ohne
+Token ausgeführt werden; für die übrigen Endpunkte wird der JWT über **Authorize** eingetragen.
+Die maschinenlesbare Spezifikation liegt unter `http://localhost:8080/v3/api-docs`.
 
 Auf macOS/Linux sind die entsprechenden Variablen mit `export NAME=...` zu setzen; die
 Maven-Befehle beginnen dort mit `./mvnw`.
