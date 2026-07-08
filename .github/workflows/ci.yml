@@ -27,5 +27,4 @@ jobs:
       - name: Run test suite
         env:
           JWT_SECRET: test-only-secret-key-with-at-least-32-bytes
-          OPENAI_API_KEY: unused-in-tests
         run: ./mvnw --batch-mode --no-transfer-progress verify

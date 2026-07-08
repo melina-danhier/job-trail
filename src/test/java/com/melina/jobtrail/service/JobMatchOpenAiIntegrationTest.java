@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "RUN_OPENAI_INTEGRATION_TESTS", matches = "(?i)true")
 class JobMatchOpenAiIntegrationTest {
 
     @Autowired

@@ -1,4 +1,8 @@
 spring:
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:unused-in-tests}
+
   datasource:
     url: "jdbc:h2:mem:jobtrail;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
     driver-class-name: org.h2.Driver

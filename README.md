@@ -299,9 +299,10 @@ Die Datei `.env` ist ignoriert; sensible Werte bleiben in der Umgebung oder Secr
 - MVC-Tests prüfen Routing, Validierung, Authentifizierung und stabile Fehlerformate.
 - Repository- und Transaktionstests verwenden H2 und echte Flyway-Migrationen.
 - API-Integrationstests decken den vollständigen JWT-Pfad sowie Benutzerisolation ab.
-- Der echte OpenAI-Integrationstest ist standardmäßig deaktiviert und läuft nur, wenn bereits vor
-  dem Testlauf ein gültiger `OPENAI_API_KEY` gesetzt ist. Normale Testläufe ohne diese Variable
-  senden keine externen Requests.
+- Der echte OpenAI-Integrationstest ist standardmäßig deaktiviert. Er läuft nur, wenn vor dem
+  Testlauf sowohl ein gültiger `OPENAI_API_KEY` als auch
+  `RUN_OPENAI_INTEGRATION_TESTS=true` gesetzt sind. Normale Testläufe senden keine externen
+  Requests.
 
 Wichtige Designentscheidungen: JWT hält die API zustandslos, Flyway versioniert das Schema, DTOs
 verhindern das Offenlegen von Entities, und Datenbank-Constraints bleiben die letzte Instanz für
