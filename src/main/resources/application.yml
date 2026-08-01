@@ -19,11 +19,15 @@ spring:
         max-interval: 2s
       on-client-errors: false
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: ${OPENAI_API_KEY:}
       chat:
         model: gpt-4o-mini
         timeout: 30s
         max-tokens: 700
+
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
 
 job-match:
   rate-limit:
@@ -32,3 +36,5 @@ job-match:
 
 jwt:
   secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:PT1H}
+  issuer: ${JWT_ISSUER:jobtrail}

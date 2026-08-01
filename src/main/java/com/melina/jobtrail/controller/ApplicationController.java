@@ -1,7 +1,8 @@
 package com.melina.jobtrail.controller;
 
-import com.melina.jobtrail.dto.application.ApplicationRequest;
+import com.melina.jobtrail.dto.application.ApplicationCreateRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
+import com.melina.jobtrail.dto.application.ApplicationUpdateRequest;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.dto.application.ApplicationStatusHistoryResponse;
 import com.melina.jobtrail.dto.PageResponse;
@@ -33,7 +34,7 @@ public class ApplicationController {
     @PostMapping
     public ResponseEntity<ApplicationResponse> createApplication(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Valid @RequestBody ApplicationRequest requestDto
+            @Valid @RequestBody ApplicationCreateRequest requestDto
     ) {
         ApplicationResponse dto = applicationService.createApplication(userDetails.email(),requestDto);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
@@ -70,7 +71,7 @@ public class ApplicationController {
     public ResponseEntity<ApplicationResponse> updateApplication(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable long id,
-            @Valid @RequestBody ApplicationRequest requestDto
+            @Valid @RequestBody ApplicationUpdateRequest requestDto
     ) {
         ApplicationResponse dto = applicationService.updateApplication(userDetails.email(),id,requestDto);
         return ResponseEntity.ok(dto);

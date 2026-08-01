@@ -4,6 +4,7 @@ import com.melina.jobtrail.exception.AiRateLimitException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -18,7 +19,7 @@ public class JobMatchRateLimiter {
     private final int requestsPerWindow;
     private final Duration window;
     private final Clock clock;
-    private final Map<String, Deque<Instant>> requests = new ConcurrentHashMap<>();
+    private final Map<String, RequestWindow> requests = new ConcurrentHashMap<>();
 
     @Autowired
     public JobMatchRateLimiter(
@@ -39,16 +40,44 @@ public class JobMatchRateLimiter {
 
     public void checkAllowed(String userId) {
         Instant now = clock.instant();
-        Deque<Instant> userRequests = requests.computeIfAbsent(userId, ignored -> new ArrayDeque<>());
-        synchronized (userRequests) {
-            Instant cutoff = now.minus(window);
-            while (!userRequests.isEmpty() && !userRequests.peekFirst().isAfter(cutoff)) {
-                userRequests.removeFirst();
-            }
-            if (userRequests.size() >= requestsPerWindow) {
+        requests.compute(userId, (ignored, existingWindow) -> {
+            RequestWindow requestWindow = existingWindow == null ? new RequestWindow() : existingWindow;
+            removeExpired(requestWindow.timestamps, now.minus(window));
+            if (requestWindow.timestamps.size() >= requestsPerWindow) {
                 throw new AiRateLimitException();
             }
-            userRequests.addLast(now);
+            requestWindow.timestamps.addLast(now);
+            requestWindow.lastAccess = now;
+            return requestWindow;
+        });
+    }
+
+    @Scheduled(fixedDelayString = "${job-match.rate-limit.cleanup-interval:PT5M}")
+    void cleanupExpiredEntries() {
+        Instant cutoff = clock.instant().minus(window);
+        requests.keySet().forEach(userId ->
+                requests.computeIfPresent(userId, (ignored, requestWindow) -> {
+                    removeExpired(requestWindow.timestamps, cutoff);
+                    if (requestWindow.timestamps.isEmpty() && !requestWindow.lastAccess.isAfter(cutoff)) {
+                        return null;
+                    }
+                    return requestWindow;
+                })
+        );
+    }
+
+    int trackedUsers() {
+        return requests.size();
+    }
+
+    private void removeExpired(Deque<Instant> timestamps, Instant cutoff) {
+        while (!timestamps.isEmpty() && !timestamps.peekFirst().isAfter(cutoff)) {
+            timestamps.removeFirst();
         }
+    }
+
+    private static final class RequestWindow {
+        private final Deque<Instant> timestamps = new ArrayDeque<>();
+        private Instant lastAccess = Instant.MIN;
     }
 }

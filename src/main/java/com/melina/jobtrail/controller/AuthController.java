@@ -7,6 +7,7 @@ import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.service.UserService;
 import com.melina.jobtrail.util.JwtUtil;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,12 +25,14 @@ public class AuthController {
     private final JwtUtil jwtUtil;
 
     @PostMapping("/register")
+    @SecurityRequirements
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
         UserResponse user = userService.createUser(registerRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
 
     @PostMapping("/login")
+    @SecurityRequirements
     public ResponseEntity<String> login(@Valid @RequestBody LoginRequest loginRequest) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(

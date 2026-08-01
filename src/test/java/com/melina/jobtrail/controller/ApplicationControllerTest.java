@@ -1,10 +1,11 @@
 package com.melina.jobtrail.controller;
 
 
-import com.melina.jobtrail.dto.application.ApplicationRequest;
+import com.melina.jobtrail.dto.application.ApplicationCreateRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
 import com.melina.jobtrail.dto.application.ApplicationStatusHistoryResponse;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
+import com.melina.jobtrail.dto.application.ApplicationUpdateRequest;
 import com.melina.jobtrail.dto.CompanyResponse;
 import com.melina.jobtrail.dto.PageResponse;
 import com.melina.jobtrail.exception.ApplicationNotFoundException;
@@ -70,9 +71,9 @@ class ApplicationControllerTest {
 
     @Test
     void createApplication_withValidDto_returnsCreatedApplication() throws Exception {
-        ApplicationRequest requestDto = createRequestApplicationDto("Software Engineer");
+        ApplicationCreateRequest requestDto = createApplicationCreateDto("Software Engineer");
         ApplicationResponse dto = createApplicationDto(1L, "Software Engineer");
-        when(applicationService.createApplication(any(String.class), any(ApplicationRequest.class)))
+        when(applicationService.createApplication(any(String.class), any(ApplicationCreateRequest.class)))
                 .thenReturn(dto);
 
         mockMvc.perform(post("/api/applications")
@@ -84,12 +85,12 @@ class ApplicationControllerTest {
                         jsonPath("$.positionTitle").value("Software Engineer")
                 );
 
-        verify(applicationService).createApplication(any(String.class), any(ApplicationRequest.class));
+        verify(applicationService).createApplication(any(String.class), any(ApplicationCreateRequest.class));
     }
 
     @Test
     void createApplication_withInvalidDto_returnsBadRequest() throws Exception {
-        ApplicationRequest requestDto = createRequestApplicationDto(null);
+        ApplicationCreateRequest requestDto = createApplicationCreateDto(null);
         mockMvc.perform(post("/api/applications")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestDto)))
@@ -216,8 +217,8 @@ class ApplicationControllerTest {
     @Test
     void updateApplication_withValidDtoAndId_returnsUpdatedApplication() throws Exception {
         ApplicationResponse applicationResponse = createApplicationDto(4L, "Software Developer");
-        ApplicationRequest requestDto = createRequestApplicationDto("Software Developer");
-        when(applicationService.updateApplication(any(String.class), anyLong(), any(ApplicationRequest.class)))
+        ApplicationUpdateRequest requestDto = createApplicationUpdateDto("Software Developer");
+        when(applicationService.updateApplication(any(String.class), anyLong(), any(ApplicationUpdateRequest.class)))
                 .thenReturn(applicationResponse);
 
         mockMvc.perform(put("/api/applications/{id}", 4L)
@@ -228,13 +229,13 @@ class ApplicationControllerTest {
                         jsonPath("$.positionTitle").value("Software Developer")
                 );
 
-        verify(applicationService).updateApplication(any(String.class), anyLong(), any(ApplicationRequest.class));
+        verify(applicationService).updateApplication(any(String.class), anyLong(), any(ApplicationUpdateRequest.class));
     }
 
     @Test
     void updateApplication_withInvalidId_returnsNotFound() throws Exception {
-        ApplicationRequest requestDto = createRequestApplicationDto("Software Developer");
-        when(applicationService.updateApplication(any(String.class), anyLong(), any(ApplicationRequest.class)))
+        ApplicationUpdateRequest requestDto = createApplicationUpdateDto("Software Developer");
+        when(applicationService.updateApplication(any(String.class), anyLong(), any(ApplicationUpdateRequest.class)))
                 .thenThrow(new ApplicationNotFoundException(5L));
 
         mockMvc.perform(put("/api/applications/{id}", 5L)
@@ -242,12 +243,12 @@ class ApplicationControllerTest {
                         .content(objectMapper.writeValueAsString(requestDto)))
                 .andExpect(status().isNotFound());
 
-        verify(applicationService).updateApplication(any(String.class), anyLong(), any(ApplicationRequest.class));
+        verify(applicationService).updateApplication(any(String.class), anyLong(), any(ApplicationUpdateRequest.class));
     }
 
     @Test
     void updateApplication_withInvalidDto_returnsBadRequest() throws Exception {
-        ApplicationRequest requestDto = createRequestApplicationDto(null);
+        ApplicationUpdateRequest requestDto = createApplicationUpdateDto(null);
         mockMvc.perform(put("/api/applications/{id}", 6L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestDto)))
@@ -345,13 +346,11 @@ class ApplicationControllerTest {
 
     }
 
-    private ApplicationRequest createRequestApplicationDto(String positionTitle) {
-        return new ApplicationRequest(
-                positionTitle,
-                1L,
-                null,
-                null,
-                null
-        );
+    private ApplicationCreateRequest createApplicationCreateDto(String positionTitle) {
+        return new ApplicationCreateRequest(positionTitle, 1L, null, null);
+    }
+
+    private ApplicationUpdateRequest createApplicationUpdateDto(String positionTitle) {
+        return new ApplicationUpdateRequest(positionTitle, 1L, null, null);
     }
 }

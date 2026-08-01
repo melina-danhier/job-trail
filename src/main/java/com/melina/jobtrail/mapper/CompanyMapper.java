@@ -14,6 +14,7 @@ public interface CompanyMapper {
     List<CompanyResponse> toResponseList(List<Company> companies);
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "version", ignore = true)
     @Mapping(target = "user", ignore = true)
     void update(@MappingTarget Company company, CompanyRequest requestDto);
 }

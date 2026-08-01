@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
 
@@ -69,13 +70,13 @@ class UserServiceTest {
 
         when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode(request.password())).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userMapper.toResponse(any(User.class))).thenReturn(expectedResponse);
 
         UserResponse response = userService.createUser(request);
 
         assertEquals(expectedResponse, response);
-        verify(userRepository).save(argThat(user ->
+        verify(userRepository).saveAndFlush(argThat(user ->
                 user.getEmail().equals("user@example.com")
                         && user.getPasswordHash().equals("encodedPassword")
         ));
@@ -88,6 +89,18 @@ class UserServiceTest {
 
         assertThrows(EmailAlreadyExistsException.class, () -> userService.createUser(request));
         verifyNoInteractions(passwordEncoder, userMapper);
+    }
+
+    @Test
+    void createUser_whenConcurrentRegistrationWins_returnsStableConflict() {
+        RegisterRequest request = new RegisterRequest("user@example.com", "password123");
+        when(userRepository.existsByEmail(request.email())).thenReturn(false);
+        when(passwordEncoder.encode(request.password())).thenReturn("encodedPassword");
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenThrow(new DataIntegrityViolationException("unique email"));
+
+        assertThrows(EmailAlreadyExistsException.class, () -> userService.createUser(request));
+        verifyNoInteractions(userMapper);
     }
 
     private User createUser(String email) {

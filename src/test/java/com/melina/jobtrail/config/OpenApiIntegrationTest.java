@@ -26,7 +26,9 @@ class OpenApiIntegrationTest {
                         status().isOk(),
                         jsonPath("$.info.title").value("JobTrail API"),
                         jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"),
-                        jsonPath("$.paths['/api/applications']").exists()
+                        jsonPath("$.paths['/api/applications']").exists(),
+                        jsonPath("$.paths['/api/auth/register'].post.security").isEmpty(),
+                        jsonPath("$.paths['/api/auth/login'].post.security").isEmpty()
                 );
     }
 }

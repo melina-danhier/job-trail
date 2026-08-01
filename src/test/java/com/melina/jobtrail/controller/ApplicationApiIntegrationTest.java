@@ -1,7 +1,8 @@
 package com.melina.jobtrail.controller;
 
 import com.melina.jobtrail.dto.LoginRequest;
-import com.melina.jobtrail.dto.application.ApplicationRequest;
+import com.melina.jobtrail.dto.application.ApplicationCreateRequest;
+import com.melina.jobtrail.dto.application.ApplicationUpdateRequest;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.entity.Company;
 import com.melina.jobtrail.entity.User;
@@ -91,14 +92,14 @@ class ApplicationApiIntegrationTest {
         mockMvc.perform(authenticated(get("/api/applications/{id}", id), ownerAuthentication))
                 .andExpectAll(status().isOk(), jsonPath("$.id").value(id));
 
-        ApplicationRequest replacement = new ApplicationRequest(
-                "Senior Backend Developer", ownerCompany.getId(), ApplicationStatus.APPLIED, null, null
+        ApplicationUpdateRequest replacement = new ApplicationUpdateRequest(
+                "Senior Backend Developer", ownerCompany.getId(), null, null
         );
         mockMvc.perform(json(authenticated(put("/api/applications/{id}", id), ownerAuthentication), replacement))
                 .andExpectAll(
                         status().isOk(),
                         jsonPath("$.positionTitle").value("Senior Backend Developer"),
-                        jsonPath("$.status").value("APPLIED")
+                        jsonPath("$.status").value("SAVED")
                 );
 
         ApplicationUpdateStatusRequest statusUpdate =
@@ -113,7 +114,7 @@ class ApplicationApiIntegrationTest {
                 .andExpectAll(
                         status().isOk(),
                         jsonPath("$[0].newStatus").value("SAVED"),
-                        jsonPath("$[1].previousStatus").value("APPLIED"),
+                        jsonPath("$[1].previousStatus").value("SAVED"),
                         jsonPath("$[1].newStatus").value("INTERVIEW_SCHEDULED")
                 );
 
@@ -164,7 +165,7 @@ class ApplicationApiIntegrationTest {
 
     @Test
     void validationAndNotFoundErrors_haveStableFormat() throws Exception {
-        ApplicationRequest invalid = new ApplicationRequest("", null, null, null, null);
+        ApplicationCreateRequest invalid = new ApplicationCreateRequest("", null, null, null);
         mockMvc.perform(json(authenticated(post("/api/applications"), ownerAuthentication), invalid))
                 .andExpectAll(
                         status().isBadRequest(),
@@ -184,8 +185,8 @@ class ApplicationApiIntegrationTest {
     void sameUser_cannotCreateSameCompanyAndPositionTwice() throws Exception {
         createApplication("Backend Developer");
 
-        ApplicationRequest duplicate = new ApplicationRequest(
-                "Backend Developer", ownerCompany.getId(), ApplicationStatus.SAVED, null, null
+        ApplicationCreateRequest duplicate = new ApplicationCreateRequest(
+                "Backend Developer", ownerCompany.getId(), null, null
         );
         mockMvc.perform(json(authenticated(post("/api/applications"), ownerAuthentication), duplicate))
                 .andExpectAll(
@@ -199,12 +200,57 @@ class ApplicationApiIntegrationTest {
     }
 
     @Test
+    void putApplication_cannotBypassStatusHistory() throws Exception {
+        long id = createApplication("Backend Developer");
+        String requestWithForbiddenStatus = """
+                {
+                  "positionTitle": "Senior Backend Developer",
+                  "companyId": %d,
+                  "status": "ACCEPTED",
+                  "applicationDate": null,
+                  "jobUrl": null
+                }
+                """.formatted(ownerCompany.getId());
+
+        mockMvc.perform(authenticated(put("/api/applications/{id}", id), ownerAuthentication)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestWithForbiddenStatus))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.message").value("Malformed or unsupported request body")
+                );
+
+        mockMvc.perform(authenticated(get("/api/applications/{id}", id), ownerAuthentication))
+                .andExpectAll(status().isOk(), jsonPath("$.status").value("SAVED"));
+        mockMvc.perform(authenticated(
+                        get("/api/applications/{id}/status-history", id), ownerAuthentication
+                ))
+                .andExpectAll(status().isOk(), jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void companyWithApplications_cannotBeDeleted() throws Exception {
+        createApplication("Backend Developer");
+
+        mockMvc.perform(authenticated(
+                        delete("/api/companies/{id}", ownerCompany.getId()), ownerAuthentication
+                ))
+                .andExpectAll(
+                        status().isConflict(),
+                        jsonPath("$.message").value(
+                                "Company with id " + ownerCompany.getId()
+                                        + " cannot be deleted while applications reference it"
+                        )
+                );
+    }
+
+    @Test
     void differentUser_canCreateSameCompanyNameAndPosition() throws Exception {
         createApplication("Backend Developer");
         User other = userRepository.findByEmail(OTHER_EMAIL).orElseThrow();
         Company otherCompany = companyRepository.save(Company.builder().user(other).name("Acme").build());
-        ApplicationRequest request = new ApplicationRequest(
-                "Backend Developer", otherCompany.getId(), ApplicationStatus.SAVED, null, null
+        ApplicationCreateRequest request = new ApplicationCreateRequest(
+                "Backend Developer", otherCompany.getId(), null, null
         );
 
         mockMvc.perform(json(authenticated(post("/api/applications"), otherAuthentication), request))
@@ -223,8 +269,8 @@ class ApplicationApiIntegrationTest {
     }
 
     private long createApplication(String positionTitle) throws Exception {
-        ApplicationRequest request = new ApplicationRequest(
-                positionTitle, ownerCompany.getId(), ApplicationStatus.SAVED, null, null
+        ApplicationCreateRequest request = new ApplicationCreateRequest(
+                positionTitle, ownerCompany.getId(), null, null
         );
         String body = mockMvc.perform(json(
                         authenticated(post("/api/applications"), ownerAuthentication), request

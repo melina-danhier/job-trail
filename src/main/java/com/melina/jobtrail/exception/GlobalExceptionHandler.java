@@ -2,10 +2,12 @@ package com.melina.jobtrail.exception;
 
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +18,16 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException() {
+        return createErrorResponseEntity(HttpStatus.BAD_REQUEST, "Malformed or unsupported request body");
+    }
+
+    @ExceptionHandler(AiFeatureDisabledException.class)
+    public ResponseEntity<ErrorResponse> handleAiFeatureDisabledException(AiFeatureDisabledException ex) {
+        return createErrorResponseEntity(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
 
     @ExceptionHandler(AiRateLimitException.class)
     public ResponseEntity<ErrorResponse> handleAiRateLimitException(AiRateLimitException ex) {
@@ -94,9 +106,22 @@ public class GlobalExceptionHandler {
         return createErrorResponseEntity(HttpStatus.NOT_FOUND,ex.getMessage());
     }
 
+    @ExceptionHandler(CompanyHasApplicationsException.class)
+    public ResponseEntity<ErrorResponse> handleCompanyHasApplicationsException(CompanyHasApplicationsException ex) {
+        return createErrorResponseEntity(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException() {
         return createErrorResponseEntity(HttpStatus.CONFLICT,"Data integrity violation");
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLockingFailureException() {
+        return createErrorResponseEntity(
+                HttpStatus.CONFLICT,
+                "The resource was modified by another request; reload it and try again"
+        );
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

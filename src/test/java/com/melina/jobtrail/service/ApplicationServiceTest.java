@@ -1,8 +1,9 @@
 package com.melina.jobtrail.service;
 
 
-import com.melina.jobtrail.dto.application.ApplicationRequest;
+import com.melina.jobtrail.dto.application.ApplicationCreateRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
+import com.melina.jobtrail.dto.application.ApplicationUpdateRequest;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.dto.application.ApplicationStatusHistoryResponse;
 import com.melina.jobtrail.dto.PageResponse;
@@ -64,7 +65,7 @@ class ApplicationServiceTest {
     @Test
     void createApplication_withValidRequest_returnsApplicationResponse() {
         String email = "user@example.com";
-        ApplicationRequest request = createApplicationRequest("Software Engineer");
+        ApplicationCreateRequest request = createApplicationRequest("Software Engineer");
         Application application = createApplication(1L, "Software Engineer");
         ApplicationResponse expectedResponse = createApplicationResponse(1L, "Software Engineer");
         User user = createUser(email);
@@ -90,7 +91,7 @@ class ApplicationServiceTest {
     void createApplication_withInvalidCompanyId_throwsCompanyNotFoundException() {
         String email = "user@example.com";
         User user = createUser(email);
-        ApplicationRequest request = createApplicationRequest("Software Engineer");
+        ApplicationCreateRequest request = createApplicationRequest("Software Engineer");
 
         when(userService.findUserOrThrow(email)).thenReturn(user);
         when(companyService.findCompanyOrThrow(request.companyId(), user.getId()))
@@ -216,7 +217,7 @@ class ApplicationServiceTest {
         User user = createUser(email);
         Company company = createCompany(1L, "Company Name");
         Application application = createApplication(1L, "Software Engineer");
-        ApplicationRequest request = createApplicationRequest("Backend Engineer");
+        ApplicationUpdateRequest request = createApplicationUpdateRequest("Backend Engineer");
         ApplicationResponse expectedResponse = createApplicationResponse(1L, "Backend Engineer");
 
         when(userService.findUserOrThrow(email)).thenReturn(user);
@@ -371,7 +372,7 @@ class ApplicationServiceTest {
         String email = "other@example.com";
         User otherUser = createUser(email);
         otherUser.setId(2L);
-        ApplicationRequest request = createApplicationRequest("Changed title");
+        ApplicationUpdateRequest request = createApplicationUpdateRequest("Changed title");
 
         when(userService.findUserOrThrow(email)).thenReturn(otherUser);
         when(applicationRepository.findByIdAndUserId(1L, otherUser.getId()))
@@ -419,14 +420,17 @@ class ApplicationServiceTest {
         verify(applicationRepository, never()).delete(any());
     }
 
-    private ApplicationRequest createApplicationRequest(String positionTitle) {
-        return new ApplicationRequest(
+    private ApplicationCreateRequest createApplicationRequest(String positionTitle) {
+        return new ApplicationCreateRequest(
                 positionTitle,
                 1L,
                 null,
-                null,
                 null
         );
+    }
+
+    private ApplicationUpdateRequest createApplicationUpdateRequest(String positionTitle) {
+        return new ApplicationUpdateRequest(positionTitle, 1L, null, null);
     }
 
     private ApplicationResponse createApplicationResponse(long id, String positionTitle) {

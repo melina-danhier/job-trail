@@ -4,6 +4,7 @@ import com.melina.jobtrail.dto.JobMatchRequest;
 import com.melina.jobtrail.dto.JobMatchResponse;
 import com.melina.jobtrail.exception.AiServiceException;
 import com.melina.jobtrail.exception.AiRateLimitException;
+import com.melina.jobtrail.exception.AiFeatureDisabledException;
 import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.security.JwtAuthFilter;
 import com.melina.jobtrail.service.JobMatchAiService;
@@ -88,5 +89,16 @@ class JobMatchControllerTest {
                         .content("{\"description\":\"Java backend role\"}"))
                 .andExpectAll(status().isTooManyRequests(),
                         jsonPath("$.message").value("AI job matching rate limit exceeded"));
+    }
+
+    @Test
+    void analyze_withoutConfiguredProvider_returnsServiceUnavailable() throws Exception {
+        when(jobMatchAiService.analyze(eq("user@example.com"), any()))
+                .thenThrow(new AiFeatureDisabledException());
+
+        mockMvc.perform(post("/api/job-match/analyze").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"Java backend role\"}"))
+                .andExpectAll(status().isServiceUnavailable(),
+                        jsonPath("$.message").value("AI job matching is not configured"));
     }
 }

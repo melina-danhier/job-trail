@@ -29,6 +29,10 @@ public class Application {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
+    @Version
+    @Column(nullable = false)
+    private long version;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

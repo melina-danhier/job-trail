@@ -1,7 +1,8 @@
 package com.melina.jobtrail.service;
 
-import com.melina.jobtrail.dto.application.ApplicationRequest;
+import com.melina.jobtrail.dto.application.ApplicationCreateRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
+import com.melina.jobtrail.dto.application.ApplicationUpdateRequest;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.dto.application.ApplicationStatusHistoryResponse;
 import com.melina.jobtrail.dto.PageResponse;
@@ -39,7 +40,7 @@ public class ApplicationService {
     private final UserService userService;
     private final CompanyService companyService;
 
-    public ApplicationResponse createApplication(String email, ApplicationRequest request) {
+    public ApplicationResponse createApplication(String email, ApplicationCreateRequest request) {
         User user = userService.findUserOrThrow(email);
         Company company = companyService.findCompanyOrThrow(request.companyId(), user.getId());
         rejectDuplicate(user.getId(), company.getId(), request.positionTitle());
@@ -83,7 +84,7 @@ public class ApplicationService {
     }
 
     public ApplicationResponse updateApplication(
-            String email, long id, ApplicationRequest requestDto
+            String email, long id, ApplicationUpdateRequest requestDto
     ) {
         User user = userService.findUserOrThrow(email);
         Application application = findApplicationOrThrow(id, user.getId());

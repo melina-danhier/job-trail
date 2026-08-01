@@ -5,10 +5,12 @@ import com.melina.jobtrail.dto.JobMatchResponse;
 import com.melina.jobtrail.dto.profile.ProfileResponse;
 import com.melina.jobtrail.exception.AiServiceException;
 import com.melina.jobtrail.exception.AiResponseParseException;
+import com.melina.jobtrail.exception.AiFeatureDisabledException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
 
 import java.util.Set;
 
@@ -19,11 +21,20 @@ public class JobMatchAiService {
     private final ProfileService profileService;
     private final ObjectMapper objectMapper;
     private final JobMatchRateLimiter rateLimiter;
+    private final JobMatchAvailability availability;
 
     public JobMatchResponse analyze(String email, JobMatchRequest request) {
+        if (!availability.isConfigured()) {
+            throw new AiFeatureDisabledException();
+        }
         rateLimiter.checkAllowed(email);
         ProfileResponse profile = profileService.getProfile(email);
-        String profileJson = objectMapper.writeValueAsString(profile);
+        final String profileJson;
+        try {
+            profileJson = objectMapper.writeValueAsString(profile);
+        } catch (JacksonException ex) {
+            throw new AiServiceException(ex);
+        }
         final JobMatchResponse response;
         try {
             response = chatClient.prompt()
@@ -52,16 +63,14 @@ public class JobMatchAiService {
                     .entity(JobMatchResponse.class, spec -> spec
                             .useProviderStructuredOutput()
                             .validateSchema());
+        } catch (JacksonException ex) {
+            throw new AiResponseParseException();
         } catch (RuntimeException ex) {
             throw new AiServiceException(ex);
         }
 
-        try {
-            validateResponse(response);
-            return response;
-        } catch (AiResponseParseException e) {
-            throw new AiResponseParseException();
-        }
+        validateResponse(response);
+        return response;
     }
 
     private void validateResponse(JobMatchResponse response) {

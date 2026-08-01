@@ -5,8 +5,10 @@ import com.melina.jobtrail.dto.CompanyResponse;
 import com.melina.jobtrail.entity.Company;
 import com.melina.jobtrail.entity.User;
 import com.melina.jobtrail.exception.CompanyNotFoundException;
+import com.melina.jobtrail.exception.CompanyHasApplicationsException;
 import com.melina.jobtrail.mapper.CompanyMapper;
 import com.melina.jobtrail.repository.CompanyRepository;
+import com.melina.jobtrail.repository.ApplicationRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,6 +35,9 @@ class CompanyServiceTest {
 
     @Mock
     private CompanyRepository companyRepository;
+
+    @Mock
+    private ApplicationRepository applicationRepository;
 
     @Mock
     private CompanyMapper companyMapper;
@@ -143,6 +148,26 @@ class CompanyServiceTest {
         companyService.deleteCompany(email, company.getId());
 
         verify(companyRepository).delete(company);
+    }
+
+    @Test
+    void deleteCompany_withApplications_returnsDomainConflictWithoutDeleting() {
+        String email = "user@example.com";
+        User user = createUser(email);
+        Company company = createCompany(1L, "Company Name");
+
+        when(userService.findUserOrThrow(email)).thenReturn(user);
+        when(companyRepository.findByIdAndUserId(company.getId(), user.getId()))
+                .thenReturn(Optional.of(company));
+        when(applicationRepository.existsByCompanyIdAndUserId(company.getId(), user.getId()))
+                .thenReturn(true);
+
+        assertThrows(
+                CompanyHasApplicationsException.class,
+                () -> companyService.deleteCompany(email, company.getId())
+        );
+
+        verify(companyRepository, never()).delete(any());
     }
 
     @Test

@@ -12,6 +12,7 @@ import com.melina.jobtrail.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +41,11 @@ public class UserService {
                 .email(normalizedEmail)
                 .passwordHash(passwordEncoder.encode(registerRequest.password()))
                 .build();
-        user = userRepository.save(user);
+        try {
+            user = userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            throw new EmailAlreadyExistsException(normalizedEmail);
+        }
         return userMapper.toResponse(user);
     }
 

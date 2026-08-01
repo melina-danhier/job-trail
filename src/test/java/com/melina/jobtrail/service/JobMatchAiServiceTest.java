@@ -6,6 +6,7 @@ import com.melina.jobtrail.dto.profile.ProfileResponse;
 import com.melina.jobtrail.exception.AiServiceException;
 import com.melina.jobtrail.exception.AiResponseParseException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
 import org.mockito.InjectMocks;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class JobMatchAiServiceTest {
@@ -38,6 +40,26 @@ class JobMatchAiServiceTest {
 
     @Mock
     private JobMatchRateLimiter rateLimiter;
+
+    @Mock
+    private JobMatchAvailability availability;
+
+    @BeforeEach
+    void enableJobMatching() {
+        when(availability.isConfigured()).thenReturn(true);
+    }
+
+    @Test
+    void analyze_withoutApiKey_rejectsBeforeLoadingPersonalData() {
+        when(availability.isConfigured()).thenReturn(false);
+
+        assertThrows(
+                com.melina.jobtrail.exception.AiFeatureDisabledException.class,
+                () -> jobMatchAiService.analyze("user@example.com", new JobMatchRequest("Java role"))
+        );
+
+        org.mockito.Mockito.verifyNoInteractions(rateLimiter, profileService, chatClient);
+    }
 
     @Test
     void analyze_withValidAiResponse_returnsJobMatchResponse() {
@@ -95,6 +117,21 @@ class JobMatchAiServiceTest {
         when(chatClient.prompt().system(anyString()).user(anyString()).call()
                 .entity(org.mockito.ArgumentMatchers.eq(JobMatchResponse.class), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(invalidResponse);
+
+        assertThrows(AiResponseParseException.class, () -> jobMatchAiService.analyze(email, request));
+    }
+
+    @Test
+    void analyze_whenStructuredResponseCannotBeParsed_throwsAiResponseParseException() {
+        String email = "user@example.com";
+        JobMatchRequest request = new JobMatchRequest("Java backend position");
+        ProfileResponse profile = createProfileResponse();
+
+        when(profileService.getProfile(email)).thenReturn(profile);
+        when(objectMapper.writeValueAsString(profile)).thenReturn("{}");
+        when(chatClient.prompt().system(anyString()).user(anyString()).call()
+                .entity(org.mockito.ArgumentMatchers.eq(JobMatchResponse.class), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(mock(tools.jackson.core.JacksonException.class));
 
         assertThrows(AiResponseParseException.class, () -> jobMatchAiService.analyze(email, request));
     }

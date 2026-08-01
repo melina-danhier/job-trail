@@ -5,8 +5,10 @@ import com.melina.jobtrail.dto.CompanyResponse;
 import com.melina.jobtrail.entity.Company;
 import com.melina.jobtrail.entity.User;
 import com.melina.jobtrail.exception.CompanyNotFoundException;
+import com.melina.jobtrail.exception.CompanyHasApplicationsException;
 import com.melina.jobtrail.mapper.CompanyMapper;
 import com.melina.jobtrail.repository.CompanyRepository;
+import com.melina.jobtrail.repository.ApplicationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CompanyService {
     private final CompanyRepository companyRepository;
+    private final ApplicationRepository applicationRepository;
     private final CompanyMapper companyMapper;
     private final UserService userService;
 
@@ -54,6 +57,9 @@ public class CompanyService {
     public void deleteCompany(String email, Long id) {
         User user = userService.findUserOrThrow(email);
         Company company = findCompanyOrThrow(id, user.getId());
+        if (applicationRepository.existsByCompanyIdAndUserId(company.getId(), user.getId())) {
+            throw new CompanyHasApplicationsException(company.getId());
+        }
         companyRepository.delete(company);
     }
 

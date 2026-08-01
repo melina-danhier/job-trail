@@ -5,6 +5,7 @@ import com.melina.jobtrail.util.ApplicationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -20,9 +21,11 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     boolean existsByUserIdAndCompanyIdAndPositionTitleAndIdNot(
             long userId, long companyId, String positionTitle, long id
     );
+    boolean existsByCompanyIdAndUserId(long companyId, long userId);
     List<Application> findAllByUserId(long id);
     Page<Application> findAllByUserId(long userId, Pageable pageable);
 
+    @EntityGraph(attributePaths = "company")
     @Query("""
             select application from Application application
             where application.user.id = :userId
