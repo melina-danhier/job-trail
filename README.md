@@ -90,11 +90,16 @@ Eine globale Maven-Installation ist nicht nötig. Unter Windows wird `mvnw.cmd`,
    .\mvnw.cmd clean test
    ```
 
-4. Für einen Start ohne Job-Matching einen lokalen Platzhalter setzen und die API starten. Für
-   echtes Matching wird stattdessen ein gültiger Schlüssel gesetzt:
+4. Die API starten. Ein OpenAI-Schlüssel ist für den normalen Bewerbungstracker nicht erforderlich:
 
    ```powershell
-   $env:OPENAI_API_KEY = "unused-without-job-matching"
+   .\mvnw.cmd spring-boot:run
+   ```
+
+   Für echtes Matching wird vor dem Start zusätzlich ein gültiger Schlüssel gesetzt:
+
+   ```powershell
+   $env:OPENAI_API_KEY = "<your-api-key>"
    .\mvnw.cmd spring-boot:run
    ```
 
@@ -191,10 +196,14 @@ Content-Type: application/json
 - `PUT /api/companies/{id}` – Firma mit demselben JSON-Format ersetzen
 - `DELETE /api/companies/{id}` – Firma löschen
 
+Eine Firma, auf die noch Bewerbungen verweisen, kann nicht gelöscht werden. Die API liefert dafür
+einen fachlichen `409 Conflict`; zuerst müssen die betreffenden Bewerbungen entfernt werden.
+
 ### Bewerbungen
 
 Die `companyId` stammt aus der Antwort von `POST /api/companies`. Beim Anlegen setzt der Server
-den Status auf `SAVED`; ein im Request übergebener Status wird dabei bewusst nicht übernommen.
+den Status immer auf `SAVED`. Create- und Update-Requests akzeptieren bewusst kein `status`-Feld;
+unbekannte Felder werden mit `400 Bad Request` abgelehnt.
 
 ```http
 POST /api/applications
@@ -212,11 +221,13 @@ Content-Type: application/json
 - `GET /api/applications` – paginierte Liste; optionale Parameter: `page`, `size`, `sortBy`,
   `direction`, `status`, `companyId`, `applicationDateFrom`, `applicationDateTo`
 - `GET /api/applications/{id}` – Bewerbung abrufen
-- `PUT /api/applications/{id}` – Bewerbung vollständig aktualisieren
+- `PUT /api/applications/{id}` – fachliche Bewerbungsdaten vollständig aktualisieren; der Status
+  bleibt unverändert
 - `DELETE /api/applications/{id}` – Bewerbung löschen
 - `GET /api/applications/{id}/status-history` – chronologische Statushistorie
 
-Statusänderung:
+Statusänderungen sind ausschließlich über den dedizierten PATCH-Endpunkt möglich, damit jeder
+echte Übergang atomar in der Statushistorie gespeichert wird:
 
 ```http
 PATCH /api/applications/1/status
@@ -259,7 +270,8 @@ Content-Type: application/json
 
 ### KI-Job-Matching
 
-Hierfür müssen ein Profil und ein gültiger `OPENAI_API_KEY` vorhanden sein:
+Hierfür müssen ein Profil und ein gültiger `OPENAI_API_KEY` vorhanden sein. Ohne Schlüssel startet
+die restliche API normal; ein Matching-Aufruf liefert dann `503 Service Unavailable`:
 
 ```http
 POST /api/job-match/analyze
@@ -274,13 +286,17 @@ Content-Type: application/json
 Die Antwort enthält Score, passende und fehlende Skills, Empfehlung und Kurzbegründung. Der
 Provider-Aufruf hat 30 Sekunden Timeout, maximal drei Versuche und 700 Ausgabetokens. Pro Benutzer
 sind standardmäßig fünf Analysen pro Minute erlaubt; konfigurierbar über
-`JOB_MATCH_REQUESTS_PER_MINUTE`.
+`JOB_MATCH_REQUESTS_PER_MINUTE`. Der lokale Rate Limiter bereinigt inaktive Benutzerfenster
+regelmäßig. Er ist für eine einzelne Anwendungsinstanz gedacht; bei horizontaler Skalierung sollte
+der Zustand beispielsweise nach Redis oder in ein API-Gateway verlagert werden.
 
 ## Konfiguration und Secrets
 
 | Variable | Erforderlich | Zweck |
 | --- | --- | --- |
 | `JWT_SECRET` | ja | HMAC-Schlüssel für JWT; mindestens 32 zufällige Bytes empfohlen |
+| `JWT_EXPIRATION` | nein | Token-Laufzeit als ISO-8601-Dauer, Standard `PT1H` |
+| `JWT_ISSUER` | nein | erwarteter JWT-Aussteller, Standard `jobtrail` |
 | `OPENAI_API_KEY` | nur für Matching | Zugang zum OpenAI-Modell |
 | `DB_USERNAME` | Produktion/optional lokal | PostgreSQL-Benutzer |
 | `DB_PASSWORD` | Produktion/optional lokal | PostgreSQL-Passwort |
@@ -288,6 +304,8 @@ sind standardmäßig fünf Analysen pro Minute erlaubt; konfigurierbar über
 
 Es werden keine echten Schlüssel, Tokens oder persönlichen Zugangsdaten im Repository erwartet.
 Die Datei `.env` ist ignoriert; sensible Werte bleiben in der Umgebung oder Secret-Verwaltung.
+Zu kurze JWT-Schlüssel sowie ungültige Laufzeiten oder leere Issuer werden bereits beim Start
+abgelehnt. Ausgestellte Tokens enthalten den konfigurierten Issuer und werden dagegen validiert.
 
 ## Teststrategie
 
@@ -297,8 +315,12 @@ Die Datei `.env` ist ignoriert; sensible Werte bleiben in der Umgebung oder Secr
 
 - Unit-Tests isolieren Services, Security-Helfer und KI-Integration mit Mockito.
 - MVC-Tests prüfen Routing, Validierung, Authentifizierung und stabile Fehlerformate.
-- Repository- und Transaktionstests verwenden H2 und echte Flyway-Migrationen.
+- Repository- und Transaktionstests verwenden lokal H2 und echte Flyway-Migrationen. Die
+  GitHub-Actions-Pipeline überschreibt die Test-Datasource mit einem PostgreSQL-16-Service und
+  validiert dieselbe Suite zusätzlich gegen die produktionsnahe Datenbank-Engine.
 - API-Integrationstests decken den vollständigen JWT-Pfad sowie Benutzerisolation ab.
+- Integrationstests prüfen, dass `PUT` keine Statushistorie umgehen kann, referenzierte Firmen
+  nicht gelöscht werden und die Anwendung ohne OpenAI-Schlüssel startet.
 - Der echte OpenAI-Integrationstest ist standardmäßig deaktiviert. Er läuft nur, wenn vor dem
   Testlauf sowohl ein gültiger `OPENAI_API_KEY` als auch
   `RUN_OPENAI_INTEGRATION_TESTS=true` gesetzt sind. Normale Testläufe senden keine externen
@@ -308,3 +330,7 @@ Wichtige Designentscheidungen: JWT hält die API zustandslos, Flyway versioniert
 verhindern das Offenlegen von Entities, und Datenbank-Constraints bleiben die letzte Instanz für
 Invarianten. Für Bewerbungsduplikate gibt es zusätzlich einen lesbaren Repository-Vorabcheck;
 parallele Constraint-Verletzungen werden ebenfalls auf denselben fachlichen `409`-Fehler abgebildet.
+Ein optimistisches Versionsfeld verhindert verlorene parallele Bewerbungsupdates. Indizes für die
+häufigsten benutzerspezifischen Status-, Datums- und Sortierabfragen sowie ein gezieltes Laden der
+zugehörigen Firma reduzieren unnötige Datenbankarbeit. Im Produktionsprofil sind Swagger UI und
+die OpenAPI-Spezifikation deaktiviert.

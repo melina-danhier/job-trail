@@ -75,7 +75,6 @@ Write-Host "6/9 Update application"
 $updated = Invoke-JsonRequest Put "/api/applications/$($application.id)" @{
     positionTitle = "Senior Backend Developer"
     companyId = $company.id
-    status = "SAVED"
     applicationDate = (Get-Date -Format "yyyy-MM-dd")
     jobUrl = "https://example.com/jobs/senior-backend"
 } $auth
