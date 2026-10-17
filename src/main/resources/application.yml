@@ -35,6 +35,20 @@ job-match:
     window: 1m
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:jobtrail-default-jwt-secret-key-must-have-at-least-32-bytes!}
   expiration: ${JWT_EXPIRATION:PT1H}
   issuer: ${JWT_ISSUER:jobtrail}
+
+jobtrail:
+  demo-data:
+    enabled: ${JOBTRAIL_DEMO_DATA_ENABLED:true}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+  api-docs:
+    path: /v3/api-docs
+    version: openapi_3_0

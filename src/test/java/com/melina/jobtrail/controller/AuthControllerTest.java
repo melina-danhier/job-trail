@@ -1,11 +1,13 @@
 package com.melina.jobtrail.controller;
 
+import com.melina.jobtrail.dto.DemoLoginResponse;
 import com.melina.jobtrail.dto.LoginRequest;
 import com.melina.jobtrail.dto.RegisterRequest;
 import com.melina.jobtrail.dto.UserResponse;
 import com.melina.jobtrail.exception.EmailAlreadyExistsException;
 import com.melina.jobtrail.security.CustomUserDetails;
 import com.melina.jobtrail.security.JwtAuthFilter;
+import com.melina.jobtrail.service.DemoDataService;
 import com.melina.jobtrail.service.UserService;
 import com.melina.jobtrail.util.JwtUtil;
 import org.junit.jupiter.api.AfterEach;
@@ -61,6 +63,9 @@ class AuthControllerTest {
     @MockitoBean
     private JwtAuthFilter jwtAuthFilter;
 
+    @MockitoBean
+    private DemoDataService demoDataService;
+
     @BeforeEach
     void setUpAuthentication() {
         CustomUserDetails userDetails = new CustomUserDetails("user@example.com", "passwordHash");
@@ -93,6 +98,7 @@ class AuthControllerTest {
                 );
 
         verify(userService).createUser(any(RegisterRequest.class));
+        verify(demoDataService).initDemoData(true);
     }
 
     @ParameterizedTest
@@ -196,5 +202,64 @@ class AuthControllerTest {
                 );
 
         verify(userService).getMe("user@example.com");
+    }
+
+    @Test
+    void login_withDemoEmail_shouldResetDemoData() throws Exception {
+        LoginRequest loginRequest = new LoginRequest(DemoDataService.DEMO_EMAIL, "JobTrail2026!");
+
+        when(jwtUtil.generateToken(loginRequest.email())).thenReturn("demo-jwt");
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpectAll(
+                        status().isOk(),
+                        content().string("demo-jwt")
+                );
+
+        verify(demoDataService).initDemoData(true);
+        verify(jwtUtil).generateToken(loginRequest.email());
+    }
+
+    @Test
+    void demoLogin_defaultResetTrue_shouldReturnDemoResponse() throws Exception {
+        DemoLoginResponse demoResponse = new DemoLoginResponse(
+                "mocked-demo-token",
+                "Bearer",
+                "demo@jobtrail.dev",
+                "Demo-Login erfolgreich!"
+        );
+        when(demoDataService.getOrCreateDemoToken(true)).thenReturn(demoResponse);
+
+        mockMvc.perform(post("/api/auth/demo"))
+                .andExpectAll(
+                        status().isOk(),
+                        jsonPath("$.token").value("mocked-demo-token"),
+                        jsonPath("$.tokenType").value("Bearer"),
+                        jsonPath("$.email").value("demo@jobtrail.dev"),
+                        jsonPath("$.message").value("Demo-Login erfolgreich!")
+                );
+
+        verify(demoDataService).getOrCreateDemoToken(true);
+    }
+
+    @Test
+    void demoLogin_withResetFalse_shouldPassFlagToService() throws Exception {
+        DemoLoginResponse demoResponse = new DemoLoginResponse(
+                "reused-demo-token",
+                "Bearer",
+                "demo@jobtrail.dev",
+                "Demo-Login erfolgreich!"
+        );
+        when(demoDataService.getOrCreateDemoToken(false)).thenReturn(demoResponse);
+
+        mockMvc.perform(post("/api/auth/demo").param("reset", "false"))
+                .andExpectAll(
+                        status().isOk(),
+                        jsonPath("$.token").value("reused-demo-token")
+                );
+
+        verify(demoDataService).getOrCreateDemoToken(false);
     }
 }

@@ -29,10 +29,10 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     @Query("""
             select application from Application application
             where application.user.id = :userId
-              and (:status is null or application.status = :status)
-              and (:companyId is null or application.company.id = :companyId)
-              and (:dateFrom is null or application.applicationDate >= :dateFrom)
-              and (:dateTo is null or application.applicationDate <= :dateTo)
+              and (cast(:status as String) is null or application.status = :status)
+              and (cast(:companyId as Long) is null or application.company.id = :companyId)
+              and (cast(:dateFrom as LocalDate) is null or application.applicationDate >= :dateFrom)
+              and (cast(:dateTo as LocalDate) is null or application.applicationDate <= :dateTo)
             """)
     Page<Application> findAllFiltered(
             @Param("userId") long userId,

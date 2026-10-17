@@ -133,6 +133,20 @@ class ApplicationRepositoryTest {
         assertEquals("Match", result.getContent().getFirst().getPositionTitle());
     }
 
+    @Test
+    void findAllFiltered_withAllNullFilters_returnsAllUserApplications() {
+        User user = createUser("nullfilters@example.com");
+        Company company = createCompany(user, "Null Filter Co");
+        createApplication(user, company, "App 1", ApplicationStatus.APPLIED, LocalDate.of(2026, 3, 1));
+        createApplication(user, company, "App 2", ApplicationStatus.INTERVIEW_SCHEDULED, LocalDate.of(2026, 3, 10));
+
+        Page<Application> result = applicationRepository.findAllFiltered(
+                user.getId(), null, null, null, null, PageRequest.of(0, 20)
+        );
+
+        assertEquals(2, result.getTotalElements());
+    }
+
     private User createUser(String mail) {
         User user = User.builder()
                 .email(mail)
