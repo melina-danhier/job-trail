@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
-class OpenApiIntegrationTest {
+class OpenApiIntegrationTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;

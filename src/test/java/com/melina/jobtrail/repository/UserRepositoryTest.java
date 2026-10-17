@@ -10,8 +10,9 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.springframework.test.context.ActiveProfiles("test")
 @DataJpaTest
-class UserRepositoryTest {
+class UserRepositoryTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;

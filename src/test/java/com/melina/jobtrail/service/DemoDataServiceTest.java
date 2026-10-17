@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class DemoDataServiceTest {
+class DemoDataServiceTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
 
     @Autowired
     private DemoDataService demoDataService;

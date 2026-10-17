@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SpringBootTest(properties = "spring.ai.openai.api-key=")
 @ActiveProfiles("test")
-class JobMatchOptionalConfigurationIntegrationTest {
+class JobMatchOptionalConfigurationIntegrationTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
 
     @Autowired
     private JobMatchAvailability availability;

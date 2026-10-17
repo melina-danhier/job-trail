@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         },
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD
 )
-class ApplicationApiIntegrationTest {
+class ApplicationApiIntegrationTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
 
     private static final String OWNER_EMAIL = "owner@example.com";
     private static final String OTHER_EMAIL = "other@example.com";

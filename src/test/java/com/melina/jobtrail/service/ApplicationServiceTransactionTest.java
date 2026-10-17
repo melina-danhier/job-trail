@@ -22,7 +22,7 @@ import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class ApplicationServiceTransactionTest {
+class ApplicationServiceTransactionTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
 
     @Autowired
     private ApplicationService applicationService;

@@ -8,7 +8,7 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @ActiveProfiles("test")
 @Slf4j
-class JobTrailApplicationTests {
+class JobTrailApplicationTests extends AbstractPostgresIntegrationTest {
 
     @Test
     void contextLoads() {
