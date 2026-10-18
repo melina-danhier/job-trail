@@ -4,21 +4,12 @@ package com.melina.jobtrail.controller;
 import com.melina.jobtrail.dto.CompanyRequest;
 import com.melina.jobtrail.dto.CompanyResponse;
 import com.melina.jobtrail.exception.CompanyNotFoundException;
-import com.melina.jobtrail.security.CustomUserDetails;
-import com.melina.jobtrail.security.JwtAuthFilter;
 import com.melina.jobtrail.service.CompanyService;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -28,38 +19,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-
 @WebMvcTest(CompanyController.class)
 @AutoConfigureMockMvc(addFilters = false)
-class CompanyControllerTest {
+class CompanyControllerTest extends AbstractControllerTest {
 
     @MockitoBean
     private CompanyService companyService;
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @MockitoBean
-    private JwtAuthFilter jwtAuthFilter;
-
-    @BeforeEach
-    void setUpAuthentication() {
-        CustomUserDetails userDetails = new CustomUserDetails("user@example.com", "passwordHash");
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                userDetails,
-                null,
-                userDetails.getAuthorities()
-        );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-    }
-
-    @AfterEach
-    void clearAuthentication() {
-        SecurityContextHolder.clearContext();
-    }
 
     @Test
     void createCompany_withValidDto_returnsCreatedCompany() throws Exception {

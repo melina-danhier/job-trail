@@ -5,28 +5,20 @@ import com.melina.jobtrail.dto.LoginRequest;
 import com.melina.jobtrail.dto.RegisterRequest;
 import com.melina.jobtrail.dto.UserResponse;
 import com.melina.jobtrail.exception.EmailAlreadyExistsException;
-import com.melina.jobtrail.security.CustomUserDetails;
-import com.melina.jobtrail.security.JwtAuthFilter;
 import com.melina.jobtrail.service.DemoDataService;
 import com.melina.jobtrail.service.UserService;
 import com.melina.jobtrail.util.JwtUtil;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 
@@ -43,44 +35,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
-class AuthControllerTest {
+class AuthControllerTest extends AbstractControllerTest {
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockitoBean
-    private UserService userService;
-
-    @MockitoBean
-    private AuthenticationManager authenticationManager;
-
-    @MockitoBean
-    private JwtUtil jwtUtil;
-
-    @MockitoBean
-    private JwtAuthFilter jwtAuthFilter;
-
-    @MockitoBean
-    private DemoDataService demoDataService;
-
-    @BeforeEach
-    void setUpAuthentication() {
-        CustomUserDetails userDetails = new CustomUserDetails("user@example.com", "passwordHash");
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                userDetails,
-                null,
-                userDetails.getAuthorities()
-        );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-    }
-
-    @AfterEach
-    void clearAuthentication() {
-        SecurityContextHolder.clearContext();
-    }
+    @MockitoBean private UserService userService;
+    @MockitoBean private DemoDataService demoDataService;
+    @MockitoBean private AuthenticationManager authenticationManager;
+    @MockitoBean private JwtUtil jwtUtil;
 
     @Test
     void register_withValidRequest_shouldReturnUserDto() throws Exception {
@@ -191,7 +151,11 @@ class AuthControllerTest {
 
     @Test
     void getMe_returnsAuthenticatedUser() throws Exception {
-        UserResponse userResponse = new UserResponse("user@example.com", Instant.parse("2026-06-24T12:00:00Z"));
+        UserResponse userResponse = new UserResponse(
+                "user@example.com",
+                Instant.parse("2026-06-24T12:00:00Z")
+        );
+
         when(userService.getMe("user@example.com")).thenReturn(userResponse);
 
         mockMvc.perform(get("/api/auth/me"))

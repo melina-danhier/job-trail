@@ -5,51 +5,38 @@ import com.melina.jobtrail.entity.Company;
 import com.melina.jobtrail.entity.User;
 import com.melina.jobtrail.util.ApplicationStatus;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.OptimisticLockException;
+import org.hibernate.StaleObjectStateException;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import com.melina.jobtrail.AbstractPostgresIntegrationTest;
 
 import java.time.LocalDate;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@Testcontainers
 @DataJpaTest
-@ActiveProfiles("test")
-@org.springframework.test.annotation.DirtiesContext
-class ApplicationPostgresRepositoryTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("jobtrail")
-            .withUsername("postgres")
-            .withPassword("postgres");
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
+class ApplicationPostgresRepositoryTest extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private ApplicationRepository applicationRepository;
 
     @Autowired
     private EntityManager entityManager;
+
+    @Test
+    void connectionEstablished() {
+        assertTrue(postgres.isCreated());
+        assertTrue(postgres.isRunning());
+    }
 
     @Test
     @DisplayName("findAllFiltered runs successfully against Postgres with null parameters, pagination and sorting")
@@ -102,7 +89,7 @@ class ApplicationPostgresRepositoryTest {
                 .status(ApplicationStatus.SAVED)
                 .build();
 
-        Exception exception = assertThrows(Exception.class, () -> {
+        ConstraintViolationException exception = assertThrows(ConstraintViolationException.class, () -> {
             entityManager.persist(duplicate);
             entityManager.flush();
         });
@@ -129,7 +116,7 @@ class ApplicationPostgresRepositoryTest {
                 .status(ApplicationStatus.APPLIED)
                 .build();
 
-        Exception exception = assertThrows(Exception.class, () -> {
+        ConstraintViolationException exception = assertThrows(ConstraintViolationException.class, () -> {
             entityManager.persist(crossApp);
             entityManager.flush();
         });
@@ -146,17 +133,31 @@ class ApplicationPostgresRepositoryTest {
     void versionColumn_isMaintainedAndIncrementedByPostgres() {
         User user = createUser("version-test@example.com");
         Company company = createCompany(user, "Version Corp");
-        Application application = createApplication(user, company, "Cloud Architect", ApplicationStatus.APPLIED, LocalDate.now());
+        Application application = createApplication(
+                user, company, "Cloud Architect",
+                ApplicationStatus.APPLIED, LocalDate.now()
+        );
+        Long id = application.getId();
 
-        assertEquals(0, application.getVersion());
+        Application first = applicationRepository.findById(id).orElseThrow();
+        entityManager.detach(first);
+        Application second = applicationRepository.findById(id).orElseThrow();
+        entityManager.detach(second);
 
-        application.setPositionTitle("Principal Cloud Architect");
+        assertEquals(0L, first.getVersion());
+        assertEquals(0L, second.getVersion());
+
+        entityManager.merge(first);
+        Application managedFirst = applicationRepository.findById(id).orElseThrow();
+        managedFirst.setPositionTitle("Principal Cloud Architect");
         entityManager.flush();
-        entityManager.clear();
+        assertEquals(1L, managedFirst.getVersion());
 
-        Application reloaded = applicationRepository.findById(application.getId()).orElseThrow();
-        assertEquals("Principal Cloud Architect", reloaded.getPositionTitle());
-        assertEquals(1, reloaded.getVersion());
+        second.setPositionTitle("Cloud Architect");
+        assertThrows(OptimisticLockException.class, () -> {
+            entityManager.merge(second);
+            entityManager.flush();
+        });
     }
 
     private User createUser(String mail) {

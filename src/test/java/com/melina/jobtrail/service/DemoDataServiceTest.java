@@ -21,7 +21,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@ActiveProfiles("test")
 class DemoDataServiceTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
 
     @Autowired

@@ -18,7 +18,6 @@ import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@org.springframework.test.context.ActiveProfiles("test")
 @DataJpaTest
 class ApplicationRepositoryTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
 

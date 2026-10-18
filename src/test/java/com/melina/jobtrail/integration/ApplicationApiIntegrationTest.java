@@ -1,5 +1,6 @@
-package com.melina.jobtrail.controller;
+package com.melina.jobtrail.integration;
 
+import com.melina.jobtrail.AbstractPostgresIntegrationTest;
 import com.melina.jobtrail.dto.LoginRequest;
 import com.melina.jobtrail.dto.application.ApplicationCreateRequest;
 import com.melina.jobtrail.dto.application.ApplicationUpdateRequest;
@@ -13,10 +14,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -32,18 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@ActiveProfiles("test")
-@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
-@Sql(
-        statements = {
-                "DELETE FROM application_status_history",
-                "DELETE FROM applications",
-                "DELETE FROM companies",
-                "DELETE FROM users"
-        },
-        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD
-)
-class ApplicationApiIntegrationTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
+@AutoConfigureMockMvc
+class ApplicationApiIntegrationTest extends AbstractPostgresCleanIntegrationTest {
 
     private static final String OWNER_EMAIL = "owner@example.com";
     private static final String OTHER_EMAIL = "other@example.com";

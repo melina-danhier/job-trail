@@ -57,7 +57,7 @@ class ProfileServiceTest {
     }
 
     @Test
-    void createProfile_whenProfileAlreadyExists_throwsIllegalStateException() {
+    void createProfile_whenProfileAlreadyExists_throwsProfileAlreadyExistsException() {
         String email = "user@example.com";
         User user = createUser(email, createProfile(1L, "Backend Developer"));
         when(userService.findUserOrThrow(email)).thenReturn(user);

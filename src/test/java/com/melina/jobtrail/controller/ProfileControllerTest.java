@@ -3,22 +3,13 @@ package com.melina.jobtrail.controller;
 import com.melina.jobtrail.dto.profile.ProfileRequest;
 import com.melina.jobtrail.dto.profile.ProfileResponse;
 import com.melina.jobtrail.exception.ProfileNotFoundException;
-import com.melina.jobtrail.security.CustomUserDetails;
-import com.melina.jobtrail.security.JwtAuthFilter;
 import com.melina.jobtrail.service.ProfileService;
 import com.melina.jobtrail.util.ExperienceLevel;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Set;
@@ -31,23 +22,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ProfileController.class)
 @AutoConfigureMockMvc(addFilters = false)
-class ProfileControllerTest {
-    @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
+class ProfileControllerTest extends AbstractControllerTest {
+
     @MockitoBean private ProfileService profileService;
-    @MockitoBean private JwtAuthFilter jwtAuthFilter;
-
-    @BeforeEach
-    void authenticate() {
-        CustomUserDetails details = new CustomUserDetails("user@example.com", "hash");
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities()));
-    }
-
-    @AfterEach
-    void clearAuthentication() {
-        SecurityContextHolder.clearContext();
-    }
 
     @Test
     void createProfile_returnsCreated() throws Exception {

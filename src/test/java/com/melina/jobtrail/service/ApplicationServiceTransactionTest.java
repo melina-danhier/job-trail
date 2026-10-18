@@ -21,7 +21,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
-@ActiveProfiles("test")
 class ApplicationServiceTransactionTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
 
     @Autowired

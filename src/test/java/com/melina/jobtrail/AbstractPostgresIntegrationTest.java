@@ -1,26 +1,16 @@
 package com.melina.jobtrail;
 
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
 
+@ActiveProfiles("test")
 public abstract class AbstractPostgresIntegrationTest {
 
-    protected static final PostgreSQLContainer<?> postgres;
+    @Container
+    @ServiceConnection
+    protected static final PostgreSQLContainer<?> postgres
+            = new PostgreSQLContainer<>("postgres:16-alpine");
 
-    static {
-        postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-                .withDatabaseName("jobtrail")
-                .withUsername("postgres")
-                .withPassword("postgres");
-        postgres.start();
-    }
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
 }

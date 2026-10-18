@@ -1,35 +1,27 @@
 package com.melina.jobtrail.controller;
 
-
+import com.melina.jobtrail.dto.CompanyResponse;
+import com.melina.jobtrail.dto.PageResponse;
 import com.melina.jobtrail.dto.application.ApplicationCreateRequest;
 import com.melina.jobtrail.dto.application.ApplicationResponse;
 import com.melina.jobtrail.dto.application.ApplicationStatusHistoryResponse;
-import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.dto.application.ApplicationUpdateRequest;
-import com.melina.jobtrail.dto.CompanyResponse;
-import com.melina.jobtrail.dto.PageResponse;
+import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.exception.ApplicationNotFoundException;
-import com.melina.jobtrail.security.CustomUserDetails;
-import com.melina.jobtrail.security.JwtAuthFilter;
 import com.melina.jobtrail.service.ApplicationService;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import com.melina.jobtrail.util.ApplicationStatus;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.http.MediaType;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-import java.util.List;
 import java.time.Instant;
-
-import com.melina.jobtrail.util.ApplicationStatus;
+import java.time.LocalDate;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -39,77 +31,55 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ApplicationController.class)
 @AutoConfigureMockMvc(addFilters = false)
-class ApplicationControllerTest {
+class ApplicationControllerTest extends AbstractControllerTest {
 
-    @MockitoBean
-    private ApplicationService applicationService;
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @MockitoBean
-    private JwtAuthFilter jwtAuthFilter;
-
-    @BeforeEach
-    void setUpAuthentication() {
-        CustomUserDetails userDetails = new CustomUserDetails("user@example.com", "passwordHash");
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                userDetails,
-                null,
-                userDetails.getAuthorities()
-        );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-    }
-
-    @AfterEach
-    void clearAuthentication() {
-        SecurityContextHolder.clearContext();
-    }
+    @MockitoBean private ApplicationService applicationService;
 
     @Test
     void createApplication_withValidDto_returnsCreatedApplication() throws Exception {
-        ApplicationCreateRequest requestDto = createApplicationCreateDto("Software Engineer");
-        ApplicationResponse dto = createApplicationDto(1L, "Software Engineer");
-        when(applicationService.createApplication(any(String.class), any(ApplicationCreateRequest.class)))
-                .thenReturn(dto);
+        ApplicationCreateRequest request = createRequest("Software Engineer");
+        ApplicationResponse response = createApplicationResponse(1L, "Software Engineer");
 
-        mockMvc.perform(post("/api/applications")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpectAll(
-                        status().isCreated(),
-                        jsonPath("$.id").value(dto.id()),
-                        jsonPath("$.positionTitle").value("Software Engineer")
-                );
+        when(applicationService.createApplication(anyString(), eq(request)))
+                .thenReturn(response);
 
-        verify(applicationService).createApplication(any(String.class), any(ApplicationCreateRequest.class));
+        mvcWithRequest(
+                post("/api/applications"),
+                objectMapper.writeValueAsString(request)
+        ).andExpectAll(
+                status().isCreated(),
+                jsonPath("$.id").value(response.id()),
+                jsonPath("$.positionTitle").value("Software Engineer")
+        );
+
+        verify(applicationService).createApplication(eq("user@example.com"), eq(request));
     }
 
     @Test
     void createApplication_withInvalidDto_returnsBadRequest() throws Exception {
-        ApplicationCreateRequest requestDto = createApplicationCreateDto(null);
-        mockMvc.perform(post("/api/applications")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isBadRequest());
+        ApplicationCreateRequest request = createRequest(null);
+
+        mvcWithRequest(
+                post("/api/applications"),
+                objectMapper.writeValueAsString(request)
+        ).andExpect(status().isBadRequest());
 
         verifyNoInteractions(applicationService);
     }
 
     @Test
-    void getApplications_returnsAllApplications() throws Exception {
+    void getApplications_withDefaultParameters_returnsFirstPage() throws Exception {
         List<ApplicationResponse> applications = List.of(
-                createApplicationDto(2L, "Backend Developer")
+                createApplicationResponse(1L, "Backend Developer")
         );
-        PageResponse<ApplicationResponse> response = new PageResponse<>(applications, 0, 20, 1, 1, true, true);
+        PageResponse<ApplicationResponse> response = new PageResponse<>(
+                applications, 0, 20, 1, 1, true, true
+        );
+
         when(applicationService.getApplications(
                 anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
                 isNull(), isNull(), isNull(), isNull()
-        ))
-                .thenReturn(response);
+        )).thenReturn(response);
 
         mockMvc.perform(get("/api/applications"))
                 .andExpectAll(
@@ -122,14 +92,17 @@ class ApplicationControllerTest {
                 );
 
         verify(applicationService).getApplications(
-                anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
+                eq("user@example.com"), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
                 isNull(), isNull(), isNull(), isNull()
         );
     }
 
     @Test
     void getApplications_withPaginationAndSorting_returnsRequestedPage() throws Exception {
-        PageResponse<ApplicationResponse> response = new PageResponse<>(List.of(), 2, 5, 10, 2, false, true);
+        PageResponse<ApplicationResponse> response = new PageResponse<>(
+                List.of(), 2, 5, 10, 2, false, true
+        );
+
         when(applicationService.getApplications(
                 anyString(), eq(2), eq(5), eq("applicationDate"), eq(Sort.Direction.ASC),
                 isNull(), isNull(), isNull(), isNull()
@@ -140,21 +113,29 @@ class ApplicationControllerTest {
                         .param("size", "5")
                         .param("sortBy", "applicationDate")
                         .param("direction", "ASC"))
-                .andExpectAll(status().isOk(), jsonPath("$.page").value(2));
+                .andExpectAll(
+                        status().isOk(),
+                        jsonPath("$.page").value(2),
+                        jsonPath("$.size").value(5)
+                );
 
         verify(applicationService).getApplications(
-                anyString(), eq(2), eq(5), eq("applicationDate"), eq(Sort.Direction.ASC),
+                eq("user@example.com"), eq(2), eq(5), eq("applicationDate"), eq(Sort.Direction.ASC),
                 isNull(), isNull(), isNull(), isNull()
         );
     }
 
     @Test
     void getApplications_withCombinedFilters_returnsMatchingPage() throws Exception {
-        PageResponse<ApplicationResponse> response = new PageResponse<>(List.of(), 0, 20, 0, 0, true, true);
+        PageResponse<ApplicationResponse> response = new PageResponse<>(
+                List.of(), 0, 20, 0, 0, true, true
+        );
+
         when(applicationService.getApplications(
                 anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
-                eq(com.melina.jobtrail.util.ApplicationStatus.INTERVIEW_SCHEDULED), eq(4L),
-                eq(java.time.LocalDate.of(2026, 1, 1)), eq(java.time.LocalDate.of(2026, 6, 30))
+                eq(ApplicationStatus.INTERVIEW_SCHEDULED), eq(4L),
+                eq(LocalDate.of(2026, 1, 1)),
+                eq(LocalDate.of(2026, 6, 30))
         )).thenReturn(response);
 
         mockMvc.perform(get("/api/applications")
@@ -165,9 +146,10 @@ class ApplicationControllerTest {
                 .andExpect(status().isOk());
 
         verify(applicationService).getApplications(
-                anyString(), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
-                eq(com.melina.jobtrail.util.ApplicationStatus.INTERVIEW_SCHEDULED), eq(4L),
-                eq(java.time.LocalDate.of(2026, 1, 1)), eq(java.time.LocalDate.of(2026, 6, 30))
+                eq("user@example.com"), eq(0), eq(20), eq("createdAt"), eq(Sort.Direction.DESC),
+                eq(ApplicationStatus.INTERVIEW_SCHEDULED), eq(4L),
+                eq(LocalDate.of(2026, 1, 1)),
+                eq(LocalDate.of(2026, 6, 30))
         );
     }
 
@@ -189,70 +171,80 @@ class ApplicationControllerTest {
 
     @Test
     void getApplicationById_withValidId_returnsApplication() throws Exception {
-        ApplicationResponse applicationResponse = createApplicationDto(3L,"Frontend Developer");
-        when(applicationService.getApplicationById(any(String.class), eq(3L)))
-                .thenReturn(applicationResponse);
+        ApplicationResponse response = createApplicationResponse(3L, "Frontend Developer");
+
+        when(applicationService.getApplicationById("user@example.com", 3L))
+                .thenReturn(response);
 
         mockMvc.perform(get("/api/applications/{id}", 3L))
                 .andExpectAll(
                         status().isOk(),
-                        jsonPath("$.id").value(applicationResponse.id()),
-                        jsonPath("$.positionTitle").value(applicationResponse.positionTitle())
+                        jsonPath("$.id").value(response.id()),
+                        jsonPath("$.positionTitle").value(response.positionTitle())
                 );
 
-        verify(applicationService).getApplicationById(any(String.class), anyLong());
+        verify(applicationService).getApplicationById("user@example.com", 3L);
     }
 
     @Test
-    void getApplicationById_withInvalidId_returnsNotFound() throws Exception {
-        when(applicationService.getApplicationById(any(String.class), anyLong()))
+    void getApplicationById_whenApplicationDoesNotExist_returnsNotFound() throws Exception {
+        when(applicationService.getApplicationById("user@example.com", 3L))
                 .thenThrow(new ApplicationNotFoundException(3L));
 
         mockMvc.perform(get("/api/applications/{id}", 3L))
                 .andExpect(status().isNotFound());
 
-        verify(applicationService).getApplicationById(any(String.class), anyLong());
+        verify(applicationService).getApplicationById("user@example.com", 3L);
     }
 
     @Test
     void updateApplication_withValidDtoAndId_returnsUpdatedApplication() throws Exception {
-        ApplicationResponse applicationResponse = createApplicationDto(4L, "Software Developer");
-        ApplicationUpdateRequest requestDto = createApplicationUpdateDto("Software Developer");
-        when(applicationService.updateApplication(any(String.class), anyLong(), any(ApplicationUpdateRequest.class)))
-                .thenReturn(applicationResponse);
+        ApplicationUpdateRequest request = updateRequest("Software Developer");
+        ApplicationResponse response = createApplicationResponse(4L, "Software Developer");
 
-        mockMvc.perform(put("/api/applications/{id}", 4L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpectAll(
-                        status().isOk(),
-                        jsonPath("$.positionTitle").value("Software Developer")
-                );
+        when(applicationService.updateApplication(
+                anyString(), eq(4L), eq(request)
+        )).thenReturn(response);
 
-        verify(applicationService).updateApplication(any(String.class), anyLong(), any(ApplicationUpdateRequest.class));
+        mvcWithRequest(
+                put("/api/applications/{id}", 4L),
+                objectMapper.writeValueAsString(request)
+        ).andExpectAll(
+                status().isOk(),
+                jsonPath("$.positionTitle").value("Software Developer")
+        );
+
+        verify(applicationService).updateApplication(
+                eq("user@example.com"), eq(4L), eq(request)
+        );
     }
 
     @Test
-    void updateApplication_withInvalidId_returnsNotFound() throws Exception {
-        ApplicationUpdateRequest requestDto = createApplicationUpdateDto("Software Developer");
-        when(applicationService.updateApplication(any(String.class), anyLong(), any(ApplicationUpdateRequest.class)))
-                .thenThrow(new ApplicationNotFoundException(5L));
+    void updateApplication_whenApplicationDoesNotExist_returnsNotFound() throws Exception {
+        ApplicationUpdateRequest request = updateRequest("Software Developer");
 
-        mockMvc.perform(put("/api/applications/{id}", 5L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isNotFound());
+        when(applicationService.updateApplication(
+                anyString(), eq(5L), eq(request)
+        )).thenThrow(new ApplicationNotFoundException(5L));
 
-        verify(applicationService).updateApplication(any(String.class), anyLong(), any(ApplicationUpdateRequest.class));
+        mvcWithRequest(
+                put("/api/applications/{id}", 5L),
+                objectMapper.writeValueAsString(request)
+        ).andExpect(status().isNotFound());
+
+        verify(applicationService).updateApplication(
+                eq("user@example.com"), eq(5L), eq(request)
+        );
     }
 
     @Test
     void updateApplication_withInvalidDto_returnsBadRequest() throws Exception {
-        ApplicationUpdateRequest requestDto = createApplicationUpdateDto(null);
-        mockMvc.perform(put("/api/applications/{id}", 6L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isBadRequest());
+        ApplicationUpdateRequest request = updateRequest(null);
+
+        mvcWithRequest(
+                put("/api/applications/{id}", 6L),
+                objectMapper.writeValueAsString(request)
+        ).andExpect(status().isBadRequest());
 
         verifyNoInteractions(applicationService);
     }
@@ -261,30 +253,33 @@ class ApplicationControllerTest {
     void updateApplicationStatus_withValidStatus_returnsUpdatedApplication() throws Exception {
         ApplicationUpdateStatusRequest request =
                 new ApplicationUpdateStatusRequest(ApplicationStatus.INTERVIEW_SCHEDULED);
-        ApplicationResponse response = createApplicationDto(6L, "Software Developer");
-        when(applicationService.updateApplicationStatus(anyString(), eq(6L), eq(request))).thenReturn(response);
+        ApplicationResponse response = createApplicationResponse(6L, "Software Developer");
 
-        mockMvc.perform(patch("/api/applications/{id}/status", 6L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpectAll(
-                        status().isOk(),
-                        jsonPath("$.id").value(6L),
-                        jsonPath("$.positionTitle").value("Software Developer")
-                );
+        when(applicationService.updateApplicationStatus(
+                "user@example.com", 6L, request
+        )).thenReturn(response);
+
+        mvcWithRequest(
+                patch("/api/applications/{id}/status", 6L),
+                objectMapper.writeValueAsString(request)
+        ).andExpectAll(
+                status().isOk(),
+                jsonPath("$.id").value(6L),
+                jsonPath("$.positionTitle").value("Software Developer")
+        );
 
         verify(applicationService).updateApplicationStatus("user@example.com", 6L, request);
     }
 
     @Test
     void updateApplicationStatus_withMissingStatus_returnsBadRequest() throws Exception {
-        mockMvc.perform(patch("/api/applications/{id}/status", 6L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpectAll(
-                        status().isBadRequest(),
-                        jsonPath("$.fieldErrors.status").value("Status cannot be null")
-                );
+        mvcWithRequest(
+                patch("/api/applications/{id}/status", 6L),
+                "{}"
+        ).andExpectAll(
+                status().isBadRequest(),
+                jsonPath("$.fieldErrors.status").value("Status cannot be null")
+        );
 
         verifyNoInteractions(applicationService);
     }
@@ -297,7 +292,9 @@ class ApplicationControllerTest {
                         12L, ApplicationStatus.SAVED, ApplicationStatus.APPLIED, changedAt
                 )
         );
-        when(applicationService.getStatusHistory("user@example.com", 7L)).thenReturn(history);
+
+        when(applicationService.getStatusHistory("user@example.com", 7L))
+                .thenReturn(history);
 
         mockMvc.perform(get("/api/applications/{id}/status-history", 7L))
                 .andExpectAll(
@@ -313,26 +310,34 @@ class ApplicationControllerTest {
 
     @Test
     void deleteApplication_withValidId_returnsNoContent() throws Exception {
-        doNothing().when(applicationService).deleteApplication(any(String.class), eq(7L));
-
         mockMvc.perform(delete("/api/applications/{id}", 7L))
                 .andExpect(status().isNoContent());
 
-        verify(applicationService).deleteApplication(any(String.class), eq(7L));
+        verify(applicationService).deleteApplication("user@example.com", 7L);
     }
 
     @Test
-    void deleteApplication_withInvalidId_returnsNotFound() throws Exception {
-        doThrow(ApplicationNotFoundException.class)
-                .when(applicationService).deleteApplication(any(String.class), eq(8L));
+    void deleteApplication_whenApplicationDoesNotExist_returnsNotFound() throws Exception {
+        doThrow(new ApplicationNotFoundException(8L))
+                .when(applicationService).deleteApplication("user@example.com", 8L);
 
         mockMvc.perform(delete("/api/applications/{id}", 8L))
                 .andExpect(status().isNotFound());
 
-        verify(applicationService).deleteApplication(any(String.class), eq(8L));
+        verify(applicationService).deleteApplication("user@example.com", 8L);
     }
 
-    private ApplicationResponse createApplicationDto(long id, String positionTitle) {
+    private ResultActions mvcWithRequest(
+            MockHttpServletRequestBuilder requestBuilder,
+            String requestString
+    ) throws Exception {
+        return mockMvc.perform(requestBuilder
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestString)
+        );
+    }
+
+    private ApplicationResponse createApplicationResponse(long id, String positionTitle) {
         return new ApplicationResponse(
                 id,
                 new CompanyResponse(1L, "Company Name", null, null),
@@ -343,14 +348,13 @@ class ApplicationControllerTest {
                 null,
                 null
         );
-
     }
 
-    private ApplicationCreateRequest createApplicationCreateDto(String positionTitle) {
+    private ApplicationCreateRequest createRequest(String positionTitle) {
         return new ApplicationCreateRequest(positionTitle, 1L, null, null);
     }
 
-    private ApplicationUpdateRequest createApplicationUpdateDto(String positionTitle) {
+    private ApplicationUpdateRequest updateRequest(String positionTitle) {
         return new ApplicationUpdateRequest(positionTitle, 1L, null, null);
     }
 }

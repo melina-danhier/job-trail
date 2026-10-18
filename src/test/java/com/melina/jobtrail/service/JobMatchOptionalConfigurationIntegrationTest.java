@@ -8,7 +8,6 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SpringBootTest(properties = "spring.ai.openai.api-key=")
-@ActiveProfiles("test")
 class JobMatchOptionalConfigurationIntegrationTest extends com.melina.jobtrail.AbstractPostgresIntegrationTest {
 
     @Autowired
