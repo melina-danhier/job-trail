@@ -10,12 +10,14 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -31,6 +33,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AiRateLimitException.class)
     public ResponseEntity<ErrorResponse> handleAiRateLimitException(AiRateLimitException ex) {
+        log.warn("AI rate limit exceeded: {}", ex.getMessage());
         return createErrorResponseEntity(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
     }
 
@@ -41,6 +44,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AiResponseParseException.class)
     public ResponseEntity<ErrorResponse> handleAiResponseParseException(AiResponseParseException ex) {
+        log.error("AI response parsing failed: {}", ex.getMessage(), ex);
         return createErrorResponseEntity(HttpStatus.BAD_GATEWAY, ex.getMessage());
     }
 
@@ -68,6 +72,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AiServiceException.class)
     public ResponseEntity<ErrorResponse> handleAiServiceException(AiServiceException ex) {
+        String causeDetails = ex.getCause() != null ? ex.getCause().getMessage() : "Unknown cause";
+        log.error("AI service failure: {} | Root cause: {}", ex.getMessage(), causeDetails, ex);
         return createErrorResponseEntity(HttpStatus.BAD_GATEWAY, ex.getMessage());
     }
 
@@ -139,7 +145,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleAllExceptions() {
+    public ResponseEntity<ErrorResponse> handleAllExceptions(Exception ex) {
+        log.error("Unhandled exception occurred: {}", ex.getMessage(), ex);
         return createErrorResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR,"An unexpected error occurred");
     }
 

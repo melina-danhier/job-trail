@@ -73,6 +73,7 @@ docker compose up -d --build
 
 - **API & Swagger UI:** `http://localhost:8080/swagger-ui/index.html`
 - **OpenAPI Spezifikation:** `http://localhost:8080/v3/api-docs`
+- **Postman Collection:** [`postman/`](postman/README.md) (inkl. automatischem JWT-Handshake)
 - **PostgreSQL Host-Port:** `localhost:5433`
 - **Logs einsehen:** `docker compose logs -f app`
 - **Beenden:** `docker compose down` (optional `-v` zum Zurücksetzen der Datenbank)
@@ -190,6 +191,14 @@ Für eine andere Umgebung kann die Basis-URL übergeben werden:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\demo.ps1 -BaseUrl "http://localhost:8080"
 ```
+
+### Postman Collection
+
+Eine vollständige Postman Collection für alle Endpunkte (inklusive automatischem JWT-Handshake und Beispieldaten) steht im Ordner [`postman/`](postman/README.md) bereit:
+- Collection: [`postman/JobTrail.postman_collection.json`](postman/JobTrail.postman_collection.json)
+- Environment: [`postman/JobTrail.postman_environment.json`](postman/JobTrail.postman_environment.json)
+
+Nach dem Import kann über `1. Authentication > 1-Klick Demo-Login` sofort ein Test-Token bezogen werden, das automatisch in der Collection-Variable `{{token}}` gespeichert wird.
 
 ### Firmen
 

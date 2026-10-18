@@ -26,9 +26,7 @@ class JobMatchOpenAiIntegrationTest {
                 .user("Candidate: Java and Spring Boot. Job: Java, Spring Boot and Docker. " +
                         "Recommendation must be APPLY, MAYBE, or DO_NOT_APPLY.")
                 .call()
-                .entity(JobMatchResponse.class, spec -> spec
-                        .useProviderStructuredOutput()
-                        .validateSchema());
+                .entity(JobMatchResponse.class, ChatClient.EntityParamSpec::validateSchema);
 
         assertNotNull(response);
         assertTrue(response.score() >= 0 && response.score() <= 100);

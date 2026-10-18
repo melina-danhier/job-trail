@@ -8,11 +8,14 @@ import com.melina.jobtrail.exception.AiServiceException;
 import com.melina.jobtrail.exception.AiResponseParseException;
 import com.melina.jobtrail.exception.AiFeatureDisabledException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.core.JacksonException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class JobMatchAiService {
@@ -34,6 +37,7 @@ public class JobMatchAiService {
         try {
             profileJson = objectMapper.writeValueAsString(aiProfile);
         } catch (JacksonException ex) {
+            log.error("Failed to serialize candidate profile to JSON for user {}: {}", email, ex.getMessage(), ex);
             throw new AiServiceException(ex);
         }
 
@@ -76,12 +80,13 @@ public class JobMatchAiService {
                         </candidate-profile>
                         """.formatted(sanitizedDescription, profileJson))
                     .call()
-                    .entity(JobMatchResponse.class, spec -> spec
-                            .useProviderStructuredOutput()
-                            .validateSchema());
+                    .entity(JobMatchResponse.class, ChatClient.EntityParamSpec::validateSchema);
         } catch (JacksonException ex) {
+            log.error("Failed to parse AI response for user {}: {}", email, ex.getMessage(), ex);
             throw new AiResponseParseException();
         } catch (RuntimeException ex) {
+            String causeMessage = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
+            log.error("AI provider call failed for user {}: {} | Root cause: {}", email, ex.getMessage(), causeMessage, ex);
             throw new AiServiceException(ex);
         }
 

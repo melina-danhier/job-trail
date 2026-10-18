@@ -1,0 +1,1156 @@
+{
+	"info": {
+		"_postman_id": "b8f1d2e3-4a5b-6c7d-8e9f-0123456789ab",
+		"name": "JobTrail API",
+		"description": "Postman Collection für die JobTrail REST API (Bewerbungstracker & KI-gestütztes Job-Matching mit Spring Boot, PostgreSQL und Spring AI).\n\n### ⚡ Quickstart:\n1. Führe als erstes die Request **`1. Authentication > 1-Klick Demo-Login (demo@jobtrail.dev)`** aus.\n2. Das JWT-Bearer-Token wird per Postman Test-Skript **automatisch** in der Collection-Variable `{{token}}` gespeichert!\n3. Alle anderen Endpunkte sind sofort authentifiziert und einsatzbereit.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string",
+			"description": "Basis-URL der laufenden JobTrail-Anwendung"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string",
+			"description": "JWT Bearer Token (wird automatisch nach Login oder Demo-Login befüllt)"
+		},
+		{
+			"key": "companyId",
+			"value": "1",
+			"type": "string",
+			"description": "ID eines Unternehmens für Einzelabfragen, Aktualisierung und Löschung"
+		},
+		{
+			"key": "applicationId",
+			"value": "1",
+			"type": "string",
+			"description": "ID einer Bewerbung für Statusänderungen, Historie und Löschung"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Authentication",
+			"description": "Endpunkte zur Benutzerregistrierung, Authentifizierung und Demo-Zugang.",
+			"item": [
+				{
+					"name": "1-Klick Demo-Login (Empfohlen)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData && jsonData.token) {",
+									"        pm.collectionVariables.set(\"token\", jsonData.token);",
+									"        if (typeof pm.environment !== 'undefined' && pm.environment) {",
+									"            pm.environment.set(\"token\", jsonData.token);",
+									"        }",
+									"        console.log(\"Demo-JWT erfolgreich in Variable 'token' gespeichert!\");",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/demo?reset=true",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"demo"
+							],
+							"query": [
+								{
+									"key": "reset",
+									"value": "true",
+									"description": "Falls true (Standard), werden Demo-Daten (Firmen, Bewerbungen, Profil) auf den sauberen Ausgangszustand zurückgesetzt."
+								}
+							]
+						},
+						"description": "Erstellt oder lädt den vorbereiteten Demo-Account (demo@jobtrail.dev) mit realistischen Beispieldaten (Spotify, SAP, Zalando, Bewerbungshistorie & Profil) und speichert den JWT automatisch."
+					},
+					"response": []
+				},
+				{
+					"name": "Benutzer anmelden (Login)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    var rawToken = pm.response.text().trim();",
+									"    if (rawToken && rawToken.startsWith(\"ey\")) {",
+									"        pm.collectionVariables.set(\"token\", rawToken);",
+									"        if (typeof pm.environment !== 'undefined' && pm.environment) {",
+									"            pm.environment.set(\"token\", rawToken);",
+									"        }",
+									"        console.log(\"Login-JWT erfolgreich in Variable 'token' gespeichert!\");",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "text/plain"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"demo@jobtrail.dev\",\n  \"password\": \"JobTrail2026!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Authentifiziert den Benutzer mit E-Mail und Passwort und liefert den JWT als Text zurück."
+					},
+					"response": []
+				},
+				{
+					"name": "Neuen Benutzer registrieren (Register)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"new.applicant@jobtrail.dev\",\n  \"password\": \"Secret123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Erstellt ein neues Benutzerkonto mit E-Mail und Passwort."
+					},
+					"response": []
+				},
+				{
+					"name": "Aktuellen Benutzer abrufen (Me)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"me"
+							]
+						},
+						"description": "Gibt die Kontoinformationen des aktuell angemeldeten Benutzers zurück."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Companies",
+			"description": "Verwaltung von Unternehmen und potenziellen Arbeitgebern.",
+			"item": [
+				{
+					"name": "Alle Unternehmen abrufen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    var companies = pm.response.json();",
+									"    if (Array.isArray(companies) && companies.length > 0) {",
+									"        pm.collectionVariables.set(\"companyId\", companies[0].id);",
+									"        if (typeof pm.environment !== 'undefined' && pm.environment) {",
+									"            pm.environment.set(\"companyId\", companies[0].id);",
+									"        }",
+									"        console.log(\"companyId auf ersten Eintrag gesetzt:\", companies[0].id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/companies",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"companies"
+							]
+						},
+						"description": "Gibt alle Unternehmen des angemeldeten Benutzers zurück und speichert die ID des ersten Unternehmens automatisch."
+					},
+					"response": []
+				},
+				{
+					"name": "Neues Unternehmen anlegen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    var company = pm.response.json();",
+									"    if (company && company.id) {",
+									"        pm.collectionVariables.set(\"companyId\", company.id);",
+									"        if (typeof pm.environment !== 'undefined' && pm.environment) {",
+									"            pm.environment.set(\"companyId\", company.id);",
+									"        }",
+									"        console.log(\"Neues Unternehmen angelegt, companyId aktualisiert:\", company.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"TechCorp GmbH\",\n  \"website\": \"https://techcorp.example.com\",\n  \"location\": \"Berlin, Deutschland\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/companies",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"companies"
+							]
+						},
+						"description": "Erstellt ein neues Unternehmen für den angemeldeten Benutzer."
+					},
+					"response": []
+				},
+				{
+					"name": "Unternehmen nach ID abrufen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/companies/{{companyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"companies",
+								"{{companyId}}"
+							]
+						},
+						"description": "Ruft ein bestimmtes Unternehmen anhand der ID aus `{{companyId}}` ab."
+					},
+					"response": []
+				},
+				{
+					"name": "Unternehmen aktualisieren",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"TechCorp International GmbH\",\n  \"website\": \"https://techcorp.example.com\",\n  \"location\": \"München, Deutschland\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/companies/{{companyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"companies",
+								"{{companyId}}"
+							]
+						},
+						"description": "Aktualisiert die Angaben zu Name, Website oder Standort des Unternehmens."
+					},
+					"response": []
+				},
+				{
+					"name": "Unternehmen löschen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 204 No Content oder 409 Conflict\", function () {",
+									"    pm.expect([204, 409]).to.include(pm.response.code);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/companies/{{companyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"companies",
+								"{{companyId}}"
+							]
+						},
+						"description": "Löscht das Unternehmen (liefert 409 Conflict, falls diesem Unternehmen noch aktive Bewerbungen zugeordnet sind)."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Applications",
+			"description": "Verwaltung von Bewerbungen, Filterung, Paginierung und Statushistorie.",
+			"item": [
+				{
+					"name": "Bewerbungen abrufen (Paginierung, Sortierung & Filter)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    var pageData = pm.response.json();",
+									"    if (pageData && pageData.content && pageData.content.length > 0) {",
+									"        pm.collectionVariables.set(\"applicationId\", pageData.content[0].id);",
+									"        if (typeof pm.environment !== 'undefined' && pm.environment) {",
+									"            pm.environment.set(\"applicationId\", pageData.content[0].id);",
+									"        }",
+									"        console.log(\"applicationId auf ersten Eintrag gesetzt:\", pageData.content[0].id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/applications?page=0&size=20&sortBy=createdAt&direction=DESC",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"applications"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "0",
+									"description": "Seitennummer (0-basiert)"
+								},
+								{
+									"key": "size",
+									"value": "20",
+									"description": "Einträge pro Seite (1-100)"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt",
+									"description": "Sortierfeld (z. B. createdAt, positionTitle, applicationDate)"
+								},
+								{
+									"key": "direction",
+									"value": "DESC",
+									"description": "Sortierrichtung (ASC oder DESC)"
+								},
+								{
+									"key": "status",
+									"value": "APPLIED",
+									"description": "Status-Filter (SAVED, APPLIED, UNDER_REVIEW, INTERVIEW_SCHEDULED, INTERVIEW_COMPLETED, OFFER_RECEIVED, REJECTED, ACCEPTED, WITHDRAWN)",
+									"disabled": true
+								},
+								{
+									"key": "companyId",
+									"value": "{{companyId}}",
+									"description": "Filter nach Unternehmens-ID",
+									"disabled": true
+								},
+								{
+									"key": "applicationDateFrom",
+									"value": "2026-01-01",
+									"description": "Datumsfilter von (YYYY-MM-DD)",
+									"disabled": true
+								},
+								{
+									"key": "applicationDateTo",
+									"value": "2026-12-31",
+									"description": "Datumsfilter bis (YYYY-MM-DD)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Ruft Bewerbungen paginiert und sortiert ab. Filter nach Status, Unternehmen und Datum können in den Query-Parametern aktiviert werden."
+					},
+					"response": []
+				},
+				{
+					"name": "Neue Bewerbung anlegen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    var app = pm.response.json();",
+									"    if (app && app.id) {",
+									"        pm.collectionVariables.set(\"applicationId\", app.id);",
+									"        if (typeof pm.environment !== 'undefined' && pm.environment) {",
+									"            pm.environment.set(\"applicationId\", app.id);",
+									"        }",
+									"        console.log(\"Neue Bewerbung angelegt, applicationId aktualisiert:\", app.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"positionTitle\": \"Cloud DevOps Engineer\",\n  \"companyId\": {{companyId}},\n  \"applicationDate\": \"2026-10-18\",\n  \"jobUrl\": \"https://techcorp.example.com/jobs/cloud-devops\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/applications",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"applications"
+							]
+						},
+						"description": "Erstellt eine neue Bewerbung für den angemeldeten Benutzer und verknüpft sie mit der in `{{companyId}}` hinterlegten Firma."
+					},
+					"response": []
+				},
+				{
+					"name": "Bewerbung nach ID abrufen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/applications/{{applicationId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"applications",
+								"{{applicationId}}"
+							]
+						},
+						"description": "Ruft die Detaildaten einer bestimmten Bewerbung anhand von `{{applicationId}}` ab."
+					},
+					"response": []
+				},
+				{
+					"name": "Bewerbung aktualisieren",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"positionTitle\": \"Lead DevOps Engineer & Cloud Architect\",\n  \"companyId\": {{companyId}},\n  \"applicationDate\": \"2026-10-18\",\n  \"jobUrl\": \"https://techcorp.example.com/jobs/cloud-devops\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/applications/{{applicationId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"applications",
+								"{{applicationId}}"
+							]
+						},
+						"description": "Aktualisiert die Stammdaten der Bewerbung (Position, Unternehmen, Datum, Link)."
+					},
+					"response": []
+				},
+				{
+					"name": "Bewerbungsstatus aktualisieren",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"INTERVIEW_SCHEDULED\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/applications/{{applicationId}}/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"applications",
+								"{{applicationId}}",
+								"status"
+							]
+						},
+						"description": "Ändert den Bewerbungsstatus (z. B. auf SAVED, APPLIED, UNDER_REVIEW, INTERVIEW_SCHEDULED, INTERVIEW_COMPLETED, OFFER_RECEIVED, REJECTED, ACCEPTED, WITHDRAWN) und protokolliert diesen Übergang automatisch in der Statushistorie."
+					},
+					"response": []
+				},
+				{
+					"name": "Statushistorie abrufen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/applications/{{applicationId}}/status-history",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"applications",
+								"{{applicationId}}",
+								"status-history"
+							]
+						},
+						"description": "Liefert die chronologische Historie aller bisherigen Statuswechsel für die angegebene Bewerbung zurück."
+					},
+					"response": []
+				},
+				{
+					"name": "Bewerbung löschen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 204 No Content\", function () {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/applications/{{applicationId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"applications",
+								"{{applicationId}}"
+							]
+						},
+						"description": "Löscht eine Bewerbung und die zugehörige Statushistorie."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4. Profiles",
+			"description": "Verwaltung des persönlichen Bewerberprofils mit Skills, Sprachen und Projekten.",
+			"item": [
+				{
+					"name": "Eigenes Profil abrufen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/profiles",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"profiles"
+							]
+						},
+						"description": "Gibt das vollständige Bewerberprofil des aktuell eingeloggten Benutzers zurück."
+					},
+					"response": []
+				},
+				{
+					"name": "Neues Profil anlegen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"targetRole\": \"Senior Backend Developer\",\n  \"locationPreference\": \"Berlin (Remote möglich)\",\n  \"availability\": \"Sofort\",\n  \"experienceLevel\": \"SENIOR\",\n  \"summary\": \"Erfahrener Java-Entwickler mit Schwerpunkt auf skalierbaren Microservices und Spring Boot.\",\n  \"skills\": [\n    {\n      \"name\": \"Java\",\n      \"level\": \"EXPERT\",\n      \"mainSkill\": true\n    },\n    {\n      \"name\": \"Spring Boot\",\n      \"level\": \"EXPERT\",\n      \"mainSkill\": true\n    },\n    {\n      \"name\": \"PostgreSQL\",\n      \"level\": \"PROFICIENT\",\n      \"mainSkill\": true\n    },\n    {\n      \"name\": \"Docker\",\n      \"level\": \"PROFICIENT\",\n      \"mainSkill\": false\n    }\n  ],\n  \"languages\": [\n    {\n      \"language\": \"Deutsch\",\n      \"level\": \"NATIVE\"\n    },\n    {\n      \"language\": \"Englisch\",\n      \"level\": \"FLUENT\"\n    }\n  ],\n  \"projects\": [\n    {\n      \"name\": \"JobTrail REST API\",\n      \"description\": \"Bewerbungsmanagement-System mit Spring Boot und PostgreSQL\",\n      \"technologies\": [\n        \"Java\",\n        \"Spring Boot\",\n        \"PostgreSQL\",\n        \"Docker\"\n      ]\n    }\n  ],\n  \"preferredRoles\": [\n    \"Senior Backend Developer\",\n    \"Java Software Engineer\"\n  ],\n  \"avoidKeywords\": [\n    \"PHP\",\n    \"WordPress\"\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/profiles",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"profiles"
+							]
+						},
+						"description": "Erstellt ein neues Profil für den angemeldeten Benutzer (liefert 409 Conflict, wenn bereits eines existiert)."
+					},
+					"response": []
+				},
+				{
+					"name": "Profil aktualisieren",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"targetRole\": \"Lead Backend Architect\",\n  \"locationPreference\": \"München (Remote)\",\n  \"availability\": \"Ab 01.01.2027\",\n  \"experienceLevel\": \"SENIOR\",\n  \"summary\": \"Architekt für Cloud-native Java-Systeme, Spring Boot und Microservice-Architekturen.\",\n  \"skills\": [\n    {\n      \"name\": \"Java\",\n      \"level\": \"EXPERT\",\n      \"mainSkill\": true\n    },\n    {\n      \"name\": \"Spring Boot\",\n      \"level\": \"EXPERT\",\n      \"mainSkill\": true\n    },\n    {\n      \"name\": \"Kubernetes\",\n      \"level\": \"PROFICIENT\",\n      \"mainSkill\": true\n    }\n  ],\n  \"languages\": [\n    {\n      \"language\": \"Deutsch\",\n      \"level\": \"NATIVE\"\n    },\n    {\n      \"language\": \"Englisch\",\n      \"level\": \"FLUENT\"\n    }\n  ],\n  \"projects\": [\n    {\n      \"name\": \"Enterprise Microservice Hub\",\n      \"description\": \"Skalierbare Event-Driven Microservice-Architektur mit Apache Kafka\",\n      \"technologies\": [\n        \"Java\",\n        \"Kafka\",\n        \"Spring Boot\",\n        \"Kubernetes\"\n      ]\n    }\n  ],\n  \"preferredRoles\": [\n    \"Lead Backend Architect\",\n    \"Principal Engineer\"\n  ],\n  \"avoidKeywords\": [\n    \"PHP\",\n    \"Legacy\"\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/profiles",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"profiles"
+							]
+						},
+						"description": "Aktualisiert das Profil des angemeldeten Benutzers vollständig."
+					},
+					"response": []
+				},
+				{
+					"name": "Profil löschen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 204 No Content\", function () {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/profiles",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"profiles"
+							]
+						},
+						"description": "Löscht das Profil des angemeldeten Benutzers."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "5. Job Match AI",
+			"description": "KI-gestützte Analyse und Matching von Stellenanzeigen mit dem Bewerberprofil (benötigt konfigurierten OPENAI_API_KEY).",
+			"item": [
+				{
+					"name": "Stellenanzeige mit Profil abgleichen",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200 OK (oder 503 wenn AI deaktiviert)\", function () {",
+									"    pm.expect([200, 503, 502, 429]).to.include(pm.response.code);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"description\": \"Wir suchen einen Senior Java Backend Entwickler mit mindestens 5 Jahren Erfahrung in Java, Spring Boot, REST APIs und Docker. Kubernetes-Kenntnisse und Erfahrung mit relationalen Datenbanken wie PostgreSQL sind von Vorteil. Idealerweise sprichst du fließend Deutsch und Englisch.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/job-match/analyze",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"job-match",
+								"analyze"
+							]
+						},
+						"description": "Führt einen KI-Abgleich (Spring AI mit GPT-4o-mini) zwischen der übergebenen Stellenanzeige und dem Profil durch. Liefert Match-Score (0-100), matchingSkills, missingSkills und eine Empfehlung."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "6. Dokumentation & System",
+			"description": "OpenAPI-Spezifikation und Swagger-UI Endpunkte.",
+			"item": [
+				{
+					"name": "OpenAPI Spezifikation (JSON)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/v3/api-docs",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"v3",
+								"api-docs"
+							]
+						},
+						"description": "Liefert die vollständige OpenAPI 3.0 Spezifikation des Backends als JSON zurück."
+					},
+					"response": []
+				},
+				{
+					"name": "Swagger UI Weiterleitung",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code ist 200 oder 302\", function () {",
+									"    pm.expect([200, 302]).to.include(pm.response.code);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/swagger-ui.html",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"swagger-ui.html"
+							]
+						},
+						"description": "Web-Oberfläche der interaktiven Swagger-UI Dokumentation."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
