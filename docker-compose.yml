@@ -2,14 +2,53 @@ services:
   postgres:
     image: postgres:16
     container_name: jobtrail-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: jobtrail
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-jobtrail}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - jobtrail_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${POSTGRES_DB:-jobtrail}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - jobtrail-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jobtrail:local
+    container_name: jobtrail-app
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-jobtrail}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-jobtrail-default-jwt-secret-key-must-have-at-least-32-bytes!}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SPRINGDOC_SWAGGER_UI_ENABLED: ${SPRINGDOC_SWAGGER_UI_ENABLED:-true}
+      SPRINGDOC_API_DOCS_ENABLED: ${SPRINGDOC_API_DOCS_ENABLED:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      org.springframework.boot.ignore: "true"
+    networks:
+      - jobtrail-network
 
 volumes:
   jobtrail_postgres_data:
+
+networks:
+  jobtrail-network:
+    driver: bridge

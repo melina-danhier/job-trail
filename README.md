@@ -63,6 +63,20 @@ flowchart LR
 Eine globale Maven-Installation ist nicht nötig. Unter Windows wird `mvnw.cmd`, unter macOS/Linux
 `./mvnw` verwendet.
 
+## Schnellstart mit Docker Compose (API + PostgreSQL)
+
+Die gesamte Anwendung (Spring Boot API + PostgreSQL) lässt sich mit einem einzigen Befehl bauen und starten:
+
+```powershell
+docker compose up -d --build
+```
+
+- **API & Swagger UI:** `http://localhost:8080/swagger-ui/index.html`
+- **OpenAPI Spezifikation:** `http://localhost:8080/v3/api-docs`
+- **PostgreSQL Host-Port:** `localhost:5433`
+- **Logs einsehen:** `docker compose logs -f app`
+- **Beenden:** `docker compose down` (optional `-v` zum Zurücksetzen der Datenbank)
+
 ## Lokales Setup: Docker und Maven
 
 1. PostgreSQL starten:
