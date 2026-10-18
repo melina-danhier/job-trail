@@ -1,5 +1,6 @@
 package com.melina.jobtrail.dto;
 
+import com.melina.jobtrail.util.JobMatchRecommendation;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
@@ -16,8 +17,8 @@ public record JobMatchResponse (
         @Schema(description = "Liste der geforderten Fähigkeiten, die im Profil fehlen", example = "[\"Kubernetes\"]")
         List<String> missingSkills,
 
-        @Schema(description = "Konkrete Handlungsempfehlung für den Bewerber", example = "Starke Übereinstimmung in den Kerntechnologien. Eine Bewerbung wird empfohlen.")
-        String recommendation,
+        @Schema(description = "Konkrete Handlungsempfehlung für den Bewerber", example = "APPLY")
+        JobMatchRecommendation recommendation,
 
         @Schema(description = "Zusammenfassung der Bewertung", example = "Das Bewerberprofil passt hervorragend zu den Kernanforderungen der Stelle als Backend Entwickler.")
         String summary

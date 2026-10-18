@@ -24,7 +24,7 @@ class JobMatchOpenAiIntegrationTest {
         JobMatchResponse response = chatClient.prompt()
                 .system("You compare candidate profiles with job descriptions. Do not invent skills.")
                 .user("Candidate: Java and Spring Boot. Job: Java, Spring Boot and Docker. " +
-                        "Recommendation must be Apply, Maybe, or Do not apply.")
+                        "Recommendation must be APPLY, MAYBE, or DO_NOT_APPLY.")
                 .call()
                 .entity(JobMatchResponse.class, spec -> spec
                         .useProviderStructuredOutput()

@@ -6,6 +6,7 @@ import com.melina.jobtrail.exception.AiServiceException;
 import com.melina.jobtrail.exception.AiRateLimitException;
 import com.melina.jobtrail.exception.AiFeatureDisabledException;
 import com.melina.jobtrail.service.JobMatchAiService;
+import com.melina.jobtrail.util.JobMatchRecommendation;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -31,12 +32,12 @@ class JobMatchControllerTest extends AbstractControllerTest {
     void analyze_returnsMatch() throws Exception {
         JobMatchRequest request = new JobMatchRequest("Java backend role");
         when(jobMatchAiService.analyze(eq("user@example.com"), any())).thenReturn(
-                new JobMatchResponse(85, List.of("Java"), List.of("Docker"), "Apply", "Good fit"));
+                new JobMatchResponse(85, List.of("Java"), List.of("Docker"), JobMatchRecommendation.APPLY, "Good fit"));
 
         mockMvc.perform(post("/api/job-match/analyze").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpectAll(status().isOk(), jsonPath("$.score").value(85),
-                        jsonPath("$.recommendation").value("Apply"));
+                        jsonPath("$.recommendation").value("APPLY"));
     }
 
     @Test

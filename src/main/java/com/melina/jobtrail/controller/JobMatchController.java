@@ -43,7 +43,7 @@ public class JobMatchController {
                             schema = @Schema(implementation = JobMatchResponse.class),
                             examples = @ExampleObject(
                                     name = "AnalyseErgebnis",
-                                    value = "{\"score\": 85, \"matchingSkills\": [\"Java\", \"Spring Boot\", \"REST APIs\", \"Docker\"], \"missingSkills\": [\"Kubernetes\"], \"recommendation\": \"Sehr gute Passung. Eine Bewerbung wird empfohlen.\", \"summary\": \"Das Profil deckt die Kernanforderungen für das Java-Backend exzellent ab.\"}"
+                                    value = "{\"score\": 85, \"matchingSkills\": [\"Java\", \"Spring Boot\", \"REST APIs\", \"Docker\"], \"missingSkills\": [\"Kubernetes\"], \"recommendation\": \"APPLY\", \"summary\": \"Das Profil deckt die Kernanforderungen für das Java-Backend exzellent ab.\"}"
                             )
                     )
             ),
