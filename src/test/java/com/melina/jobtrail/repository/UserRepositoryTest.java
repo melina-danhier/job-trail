@@ -62,4 +62,32 @@ class UserRepositoryTest extends com.melina.jobtrail.AbstractPostgresIntegration
     void existsByEmail_returnsFalseIfEmailDoesNotExist () {
         assertFalse(userRepository.existsByEmail("nonexisting@example.com"));
     }
+
+    @Test
+    void duplicateEmail_triggersPostgresUniqueConstraintViolation() {
+        User user1 = User.builder()
+                .email("duplicate@example.com")
+                .passwordHash("hash1")
+                .build();
+        entityManager.persist(user1);
+        entityManager.flush();
+
+        User user2 = User.builder()
+                .email("duplicate@example.com")
+                .passwordHash("hash2")
+                .build();
+
+        org.hibernate.exception.ConstraintViolationException ex = assertThrows(
+                org.hibernate.exception.ConstraintViolationException.class,
+                () -> {
+                    entityManager.persist(user2);
+                    entityManager.flush();
+                }
+        );
+        assertTrue(
+                ex.getMessage().contains("uc_users_email")
+                        || (ex.getCause() != null && ex.getCause().getMessage().contains("uc_users_email")),
+                "Expected violation of uc_users_email unique constraint"
+        );
+    }
 }

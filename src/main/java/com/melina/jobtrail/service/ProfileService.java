@@ -28,7 +28,8 @@ public class ProfileService {
         Profile profile = profileMapper.toEntity(request);
         user.setProfile(profile);
         userRepository.save(user);
-        return profileMapper.toResponse(profile);
+        userRepository.flush();
+        return profileMapper.toResponse(user.getProfile());
     }
 
     @Transactional(readOnly = true)
@@ -45,7 +46,8 @@ public class ProfileService {
         }
         profileMapper.updateEntityFromRequest(profile, request);
         userRepository.save(user);
-        return profileMapper.toResponse(profile);
+        userRepository.flush();
+        return profileMapper.toResponse(user.getProfile());
     }
 
     public void deleteProfile(String email) {
