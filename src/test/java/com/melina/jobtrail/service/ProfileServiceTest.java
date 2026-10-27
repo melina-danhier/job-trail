@@ -84,6 +84,21 @@ class ProfileServiceTest {
     }
 
     @Test
+    void getProfile_strictlyScopedToAuthenticatedUserEmail() {
+        String email = "alice@example.com";
+        Profile profile = createProfile(42L, "Architect");
+        ProfileResponse expectedResponse = createResponse(42L, "Architect");
+
+        when(userService.getProfile(email)).thenReturn(profile);
+        when(profileMapper.toResponse(profile)).thenReturn(expectedResponse);
+
+        ProfileResponse response = profileService.getProfile(email);
+
+        assertEquals(expectedResponse, response);
+        verify(userService).getProfile("alice@example.com");
+    }
+
+    @Test
     void updateProfile_withExistingProfile_returnsProfileResponse() {
         String email = "user@example.com";
         Profile profile = createProfile(1L, "Backend Developer");
@@ -102,7 +117,7 @@ class ProfileServiceTest {
     }
 
     @Test
-    void updateProfile_whenProfileDoesNotExist_throwsIllegalStateException() {
+    void updateProfile_whenProfileDoesNotExist_throwsProfileNotFoundException() {
         String email = "user@example.com";
         User user = createUser(email, null);
         when(userService.findUserOrThrow(email)).thenReturn(user);

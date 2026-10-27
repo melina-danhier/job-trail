@@ -36,15 +36,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String authHeader = request.getHeader("Authorization");
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 try {
-                    String token = authHeader.substring(7);
+                    String token = authHeader.substring(7).trim();
+                    if (token.isEmpty()) {
+                        throw new BadCredentialsException("Bearer token is empty");
+                    }
                     String email = jwtUtil.validateTokenAndExtractEmail(token);
+                    if (email == null || email.isBlank()) {
+                        throw new BadCredentialsException("Token has no valid subject");
+                    }
                     UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                    if (userDetails == null) {
+                        throw new UsernameNotFoundException("User not found: " + email);
+                    }
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities()
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                } catch (JwtException | IllegalArgumentException | UsernameNotFoundException exception) {
+                } catch (JwtException | IllegalArgumentException | UsernameNotFoundException | BadCredentialsException exception) {
                     SecurityContextHolder.clearContext();
                     authenticationEntryPoint.commence(
                             request,

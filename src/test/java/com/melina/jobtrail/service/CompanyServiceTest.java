@@ -83,6 +83,22 @@ class CompanyServiceTest {
     }
 
     @Test
+    void getAllCompanies_scopesQueryStrictlyToAuthenticatedUserId() {
+        String email = "user1@example.com";
+        User user = createUser(email);
+        user.setId(42L);
+
+        when(userService.findUserOrThrow(email)).thenReturn(user);
+        when(companyRepository.findAllByUserId(42L)).thenReturn(List.of());
+        when(companyMapper.toResponseList(any())).thenReturn(List.of());
+
+        companyService.getAllCompanies(email);
+
+        verify(companyRepository).findAllByUserId(42L);
+        verify(companyRepository, never()).findAll();
+    }
+
+    @Test
     void getCompanyById_withValidId_returnsCompanyResponse() {
         String email = "user@example.com";
         User user = createUser(email);
@@ -111,6 +127,20 @@ class CompanyServiceTest {
                 CompanyNotFoundException.class,
                 () -> companyService.getCompanyById(email, 99L)
         );
+        verifyNoInteractions(companyMapper);
+    }
+
+    @Test
+    void getCompanyById_ownedByAnotherUser_isRejectedWithNotFound() {
+        String email = "attacker@example.com";
+        User user = createUser(email);
+        user.setId(7L);
+
+        when(userService.findUserOrThrow(email)).thenReturn(user);
+        when(companyRepository.findByIdAndUserId(1L, user.getId())).thenReturn(Optional.empty());
+
+        assertThrows(CompanyNotFoundException.class,
+                () -> companyService.getCompanyById(email, 1L));
         verifyNoInteractions(companyMapper);
     }
 

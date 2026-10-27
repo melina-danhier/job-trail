@@ -1,18 +1,23 @@
 package com.melina.jobtrail.exception;
 
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.method.annotation.HandlerMethodValidationException;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -94,12 +99,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EmailAlreadyExistsException.class)
     public ResponseEntity<ErrorResponse> handleEmailAlreadyExistsException(EmailAlreadyExistsException ex) {
-        return createErrorResponseEntity(HttpStatus.CONFLICT,ex.getMessage());
+        return createErrorResponseEntity(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(ApplicationNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleApplicationNotFoundException(ApplicationNotFoundException ex) {
-        return createErrorResponseEntity(HttpStatus.NOT_FOUND,ex.getMessage());
+        return createErrorResponseEntity(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(DuplicateApplicationException.class)
@@ -109,7 +114,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CompanyNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleCompanyNotFoundException(CompanyNotFoundException ex) {
-        return createErrorResponseEntity(HttpStatus.NOT_FOUND,ex.getMessage());
+        return createErrorResponseEntity(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(CompanyHasApplicationsException.class)
@@ -119,7 +124,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException() {
-        return createErrorResponseEntity(HttpStatus.CONFLICT,"Data integrity violation");
+        return createErrorResponseEntity(HttpStatus.CONFLICT, "Data integrity violation");
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
@@ -136,22 +141,53 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(error ->
                 fieldErrors.put(error.getField(), error.getDefaultMessage())
         );
-        return createErrorResponseEntity(HttpStatus.BAD_REQUEST,"Validation failed",fieldErrors);
+        return createErrorResponseEntity(HttpStatus.BAD_REQUEST, "Validation failed", fieldErrors);
     }
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleBadCredentialsException() {
-        return createErrorResponseEntity(HttpStatus.UNAUTHORIZED,"Invalid credentials");
+        return createErrorResponseEntity(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(AuthenticationException ex) {
+        return createErrorResponseEntity(HttpStatus.UNAUTHORIZED, "Unauthorized");
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException ex) {
+        return createErrorResponseEntity(HttpStatus.FORBIDDEN, "Access denied");
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupportedException(HttpRequestMethodNotSupportedException ex) {
+        return createErrorResponseEntity(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                "Method " + ex.getMethod() + " is not allowed for this endpoint"
+        );
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException ex) {
+        return createErrorResponseEntity(
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                "Content type '" + ex.getContentType() + "' is not supported"
+        );
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFoundException(NoResourceFoundException ex) {
+        return createErrorResponseEntity(HttpStatus.NOT_FOUND, "Resource not found");
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAllExceptions(Exception ex) {
         log.error("Unhandled exception occurred: {}", ex.getMessage(), ex);
-        return createErrorResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR,"An unexpected error occurred");
+        return createErrorResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
     }
 
     private ResponseEntity<ErrorResponse> createErrorResponseEntity(HttpStatus httpStatus, String message) {
-        return createErrorResponseEntity(httpStatus,message,null);
+        return createErrorResponseEntity(httpStatus, message, null);
     }
 
     private ResponseEntity<ErrorResponse> createErrorResponseEntity(

@@ -212,6 +212,36 @@ class ApplicationServiceTest {
     }
 
     @Test
+    void getApplicationById_ownedByAnotherUser_isRejectedWithNotFound() {
+        String userEmail = "attacker@example.com";
+        User user = createUser(userEmail);
+        user.setId(10L);
+
+        when(userService.findUserOrThrow(userEmail)).thenReturn(user);
+        when(applicationRepository.findByIdAndUserId(42L, user.getId())).thenReturn(Optional.empty());
+
+        assertThrows(ApplicationNotFoundException.class,
+                () -> applicationService.getApplicationById(userEmail, 42L));
+        verifyNoInteractions(applicationMapper);
+    }
+
+    @Test
+    void createApplication_withCompanyOwnedByAnotherUser_throwsCompanyNotFoundException() {
+        String userEmail = "user@example.com";
+        User user = createUser(userEmail);
+        user.setId(5L);
+        ApplicationCreateRequest request = new ApplicationCreateRequest("Dev", 88L, LocalDate.now(), null);
+
+        when(userService.findUserOrThrow(userEmail)).thenReturn(user);
+        when(companyService.findCompanyOrThrow(88L, user.getId()))
+                .thenThrow(new CompanyNotFoundException(88L));
+
+        assertThrows(CompanyNotFoundException.class,
+                () -> applicationService.createApplication(userEmail, request));
+        verifyNoInteractions(applicationMapper, applicationRepository);
+    }
+
+    @Test
     void updateApplication_withValidRequest_returnsApplicationResponse() {
         String email = "user@example.com";
         User user = createUser(email);
@@ -235,6 +265,24 @@ class ApplicationServiceTest {
         assertSame(company, application.getCompany());
         verify(applicationMapper).updateApplication(application, request);
         verify(applicationRepository).save(application);
+    }
+
+    @Test
+    void updateApplication_withCompanyOwnedByAnotherUser_throwsCompanyNotFoundException() {
+        String userEmail = "user@example.com";
+        User user = createUser(userEmail);
+        user.setId(5L);
+        Application application = createApplication(1L, "Dev");
+        ApplicationUpdateRequest request = new ApplicationUpdateRequest("Dev", 999L, LocalDate.now(), null);
+
+        when(userService.findUserOrThrow(userEmail)).thenReturn(user);
+        when(applicationRepository.findByIdAndUserId(1L, user.getId())).thenReturn(Optional.of(application));
+        when(companyService.findCompanyOrThrow(999L, user.getId()))
+                .thenThrow(new CompanyNotFoundException(999L));
+
+        assertThrows(CompanyNotFoundException.class,
+                () -> applicationService.updateApplication(userEmail, 1L, request));
+        verify(applicationRepository, never()).save(any());
     }
 
     @Test
