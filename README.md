@@ -294,7 +294,11 @@ Content-Type: application/json
 ### KI-Job-Matching
 
 Hierfür müssen ein Profil und ein gültiger `OPENAI_API_KEY` vorhanden sein. Ohne Schlüssel startet
-die restliche API normal; ein Matching-Aufruf liefert dann `503 Service Unavailable`:
+die restliche API normal; ein Matching-Aufruf liefert dann `503 Service Unavailable`.
+
+#### Realistisches Beispiel
+
+**Request:**
 
 ```http
 POST /api/job-match/analyze
@@ -302,16 +306,63 @@ Authorization: Bearer <TOKEN>
 Content-Type: application/json
 
 {
-  "description": "Gesucht wird ein Java Backend Developer mit Spring Boot und Docker."
+  "description": "Wir suchen eine/n Java Backend Entwickler/in (m/w/d) in Berlin oder Remote. Aufgaben: Konzeption und Entwicklung robuster REST-APIs mit Java 21 und Spring Boot, Anbindung von PostgreSQL-Datenbanken via Hibernate/JPA, Containerisierung mit Docker. Anforderungen: Fundierte Kenntnisse in Java, Spring Boot und relationalen Datenbanken. Erfahrung mit Docker und CI/CD erwünscht. Deutsch fließend, Englisch verhandlungssicher. Kein unbezahltes Praktikum."
 }
 ```
 
-Die Antwort enthält Score, passende und fehlende Skills, Empfehlung und Kurzbegründung. Der
-Provider-Aufruf hat 30 Sekunden Timeout, maximal drei Versuche und 700 Ausgabetokens. Pro Benutzer
-sind standardmäßig fünf Analysen pro Minute erlaubt; konfigurierbar über
-`JOB_MATCH_REQUESTS_PER_MINUTE`. Der lokale Rate Limiter bereinigt inaktive Benutzerfenster
-regelmäßig. Er ist für eine einzelne Anwendungsinstanz gedacht; bei horizontaler Skalierung sollte
-der Zustand beispielsweise nach Redis oder in ein API-Gateway verlagert werden.
+**Erfolgreiche Antwort (`200 OK`):**
+
+```json
+{
+  "score": 88,
+  "matchingSkills": [
+    "Java",
+    "Spring Boot",
+    "PostgreSQL",
+    "REST-APIs"
+  ],
+  "missingSkills": [
+    "Docker",
+    "CI/CD"
+  ],
+  "recommendation": "APPLY",
+  "summary": "Das Bewerberprofil passt hervorragend zu den Kernanforderungen der Position als Java Backend Entwickler. Die geforderten Technologien Java, Spring Boot und relationale Datenbanken werden vollumfänglich abgedeckt. Für Docker und CI/CD sind Entwicklungspotenziale vorhanden, die jedoch bei der vorhandenen Seniorität schnell aufgebaut werden können. Standort und Sprachkenntnisse stimmen überein."
+}
+```
+
+#### Bewertungsrubrik & Validierung
+
+Das System erzwingt eine strikte Korrelation zwischen Punktwert und Empfehlung:
+- **80–100 (`APPLY`)**: Der Bewerber deckt alle Kerntechnologien und Pflichtkriterien ab; Seniorität und Rahmenbedingungen stimmen überein.
+- **50–79 (`MAYBE`)**: Der Bewerber erfüllt die meisten Kernskills, weist jedoch kleinere Lücken bei Sekundäranforderungen oder optionalen Tools auf.
+- **0–49 (`DO_NOT_APPLY`)**: Erhebliche Abweichungen im Tech-Stack, mangelnde Erfahrung oder Auftreten von Begriffen aus den persönlichen `avoidKeywords` des Profils.
+
+Widersprüchliche KI-Rückmeldungen (z. B. Score 90 bei gleichzeitiger `DO_NOT_APPLY`-Empfehlung) oder unvollständige JSON-Payloads werden clientseitig strikt als Schema-Validierungsfehler verworfen.
+
+#### Fehlerbehandlung & HTTP-Statuscodes
+
+| Statuscode | Ursache | Verhalten & Antwort |
+| --- | --- | --- |
+| `400 Bad Request` | Leere oder fehlende `description` | Bean Validation meldet detaillierten Feldfehler. |
+| `404 Not Found` | Benutzer hat noch kein Profil | Hinweis, zuerst `POST /api/profiles` auszuführen. |
+| `429 Too Many Requests` | Rate-Limit überschritten | Standardmäßig maximal 5 Anfragen pro Minute je Benutzer (`JOB_MATCH_REQUESTS_PER_MINUTE`). |
+| `502 Bad Gateway` | Providerfehler, JSON-Parse-Fehler, Schemaabweichung oder Timeout | Transparente Fehlermeldung; schützt die Anwendung vor fehlerhaften LLM-Antworten. |
+| `503 Service Unavailable` | Kein `OPENAI_API_KEY` gesetzt | KI-Feature ist sauber deaktiviert; Kernanwendung bleibt voll einsatzfähig. |
+
+#### Datenintegrität & Transaktionssicherheit
+
+Der Matching-Endpunkt ist eine **rein lesende Operation**:
+- Es werden ausschließlich das Profil des authentifizierten Benutzers und die übergebene Stellenbeschreibung ausgewertet.
+- Es erfolgen keinerlei Schreibzugriffe auf die Datenbank.
+- Im Fehlerfall (Timeouts, Parse-Fehler, Rate-Limits) verbleiben weder verwaiste Datensätze noch inkonsistente Zwischenzustände.
+
+#### Grenzen und Einschränkungen des Matchings
+
+- **Reine Orientierungs- und Entscheidungshilfe**: Das Matching analysiert Übereinstimmungen heuristisch; es ersetzt weder das sorgfältige Lesen der Stellenanzeige noch führt es automatisierte Bewerbungsaktionen aus.
+- **Halluzinationsrisiko**: Sprachmodelle können Anforderungen über- oder unterinterpretieren. Die Begründungen und Skill-Listen sind unverbindlich und müssen eigenverantwortlich geprüft werden.
+- **Sprachkonsistenz**: Die Zusammenfassung (`summary`) wird dynamisch in der Sprache der Stellenanzeige generiert (z. B. Deutsch oder Englisch).
+- **Datensparsamkeit**: Es werden nur strukturierte Profildaten (Kenntnisse, Seniorität, Präferenzen) und die Stellenbeschreibung an die OpenAI-Schnittstelle übertragen; sensible Daten wie Passwörter oder unbeteiligte Firmendaten werden niemals übermittelt.
+- **Rate-Limiting**: Das lokale In-Memory-Rate-Limiting schützt vor unkontrollierten API-Kosten. Bei horizontal skalierenden Deployments sollte die Begrenzung auf Redis oder das API-Gateway ausgelagert werden.
 
 ## Konfiguration und Secrets
 

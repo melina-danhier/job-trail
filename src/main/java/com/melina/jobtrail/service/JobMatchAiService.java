@@ -7,13 +7,16 @@ import com.melina.jobtrail.dto.profile.ProfileResponse;
 import com.melina.jobtrail.exception.AiServiceException;
 import com.melina.jobtrail.exception.AiResponseParseException;
 import com.melina.jobtrail.exception.AiFeatureDisabledException;
+import com.melina.jobtrail.util.JobMatchRecommendation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.core.JacksonException;
+
+import java.net.SocketTimeoutException;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
@@ -85,6 +88,14 @@ public class JobMatchAiService {
             log.error("Failed to parse AI response for user {}: {}", email, ex.getMessage(), ex);
             throw new AiResponseParseException();
         } catch (RuntimeException ex) {
+            if (isParseException(ex)) {
+                log.error("Failed to parse or validate AI response schema for user {}: {}", email, ex.getMessage(), ex);
+                throw new AiResponseParseException();
+            }
+            if (isTimeout(ex)) {
+                log.warn("AI service call timed out for user {}: {}", email, ex.getMessage());
+                throw new AiServiceException("AI service request timed out", ex);
+            }
             String causeMessage = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
             log.error("AI provider call failed for user {}: {} | Root cause: {}", email, ex.getMessage(), causeMessage, ex);
             throw new AiServiceException(ex);
@@ -107,9 +118,66 @@ public class JobMatchAiService {
                 || response.recommendation() == null
                 || response.summary() == null
                 || response.summary().isBlank()
-                || response.summary().length() > 2000) {
+                || response.summary().length() > 2000
+                || !isRecommendationConsistent(response.score(), response.recommendation())) {
             throw new AiResponseParseException();
         }
+    }
+
+    private boolean isRecommendationConsistent(int score, JobMatchRecommendation recommendation) {
+        if (score >= 80) {
+            return recommendation == JobMatchRecommendation.APPLY;
+        } else if (score >= 50) {
+            return recommendation == JobMatchRecommendation.MAYBE;
+        } else {
+            return recommendation == JobMatchRecommendation.DO_NOT_APPLY;
+        }
+    }
+
+    private boolean isParseException(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof JacksonException
+                    || current.getClass().getName().contains("ConversionException")
+                    || current.getClass().getName().contains("JsonParseException")
+                    || current.getClass().getName().contains("JsonMappingException")
+                    || current.getClass().getName().contains("SchemaValidationException")) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null) {
+                String lower = message.toLowerCase();
+                if (lower.contains("failed to parse")
+                        || lower.contains("json parse error")
+                        || lower.contains("schema validation failed")
+                        || lower.contains("could not convert")
+                        || lower.contains("deserializ")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isTimeout(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof TimeoutException
+                    || current instanceof SocketTimeoutException
+                    || current.getClass().getName().contains("TimeoutException")) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null) {
+                String lower = message.toLowerCase();
+                if (lower.contains("timed out") || lower.contains("timeout")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private boolean isBlank(String value) {
