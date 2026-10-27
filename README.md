@@ -6,268 +6,352 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 
-**Eine produktionsnah aufgebaute REST-API, die Bewerbungen benutzerspezifisch verwaltet,
-Statusverläufe nachvollziehbar macht und Stellenbeschreibungen optional per KI mit dem eigenen
-Profil abgleicht.**
+**Eine produktionsnah aufgebaute REST-API, die Bewerbungen benutzerspezifisch verwaltet, Statusverläufe auditierbar nachvollzieht und Stellenbeschreibungen optional per KI mit dem eigenen Bewerberprofil abgleicht.**
 
-JobTrail ist eine REST-API, mit der Benutzer Firmen und Bewerbungen verwalten, Statusänderungen
-nachverfolgen und ein eigenes Bewerbungsprofil pflegen können. Der wichtigste Use Case ist ein
-persönlicher Bewerbungstracker: Firma anlegen, Bewerbung erfassen und ihren Weg von `SAVED` bis
-beispielsweise `INTERVIEW_SCHEDULED`, `OFFER_RECEIVED` oder `REJECTED` dokumentieren. Optional
-vergleicht ein KI-gestütztes Matching das Profil mit einer Stellenbeschreibung.
+---
 
-## MVP und bewusste Grenzen
+## 🚀 Schnellzugriff & Dokumentation
 
-Zum MVP gehören Registrierung und Login, benutzerspezifische Firmen, Bewerbungen mit Filterung
-und Statushistorie, ein strukturiertes Profil sowie das optionale Job-Matching. Ein Benutzer kann
-dieselbe Kombination aus Firma und Positionsbezeichnung nur einmal anlegen; andere Benutzer
-dürfen dieselben Firmen- und Positionsnamen verwenden. Duplikate liefern stabil `409 Conflict`.
+| Ressource | URL / Pfad | Beschreibung |
+| --- | --- | --- |
+| 📖 **Swagger UI (interaktiv)** | [`http://localhost:8080/swagger-ui/index.html`](http://localhost:8080/swagger-ui/index.html) | Interaktive API-Konsole mit JWT-Authorize-Button (`Bearer <TOKEN>`) |
+| 📄 **OpenAPI v3 Spezifikation** | [`http://localhost:8080/v3/api-docs`](http://localhost:8080/v3/api-docs) | Maschinenlesbare OpenAPI 3.0 Spezifikation im JSON-Format |
+| 📬 **Postman Collection & Env** | [`postman/README.md`](postman/README.md) | Vorkonfigurierte Requests, 1-Klick Demo-Login & 14 automatisierte Fehlertests |
+| ⚡ **Automatisierte CLI-Demo** | [`scripts/demo.ps1`](scripts/demo.ps1) | 9-stufiger PowerShell-End-to-End-Testlauf mit Zusicherungen |
+| 🚦 **CI Pipeline Status** | [GitHub Actions Workflow](https://github.com/melina-danhier/job-trail/actions/workflows/ci.yml) | Automatisierter Build & Postgres-Integrationstests bei jedem Push |
 
-Bewusst nicht Teil des aktuellen MVP sind ein Frontend, E-Mail-Verifikation, Passwort-Reset,
-Refresh-Tokens, Rollen/Rechte, Datei-Uploads, Benachrichtigungen und kollaborativ geteilte Daten.
-Das KI-Matching ist eine Entscheidungshilfe, keine verbindliche Bewertung, und benötigt einen
-externen OpenAI-Zugang.
+---
 
-## Tech-Stack und Architektur
+## 🏛️ Architektur & Schichtenmodell
 
-- Java 21, Spring Boot 4.1 und Maven Wrapper
-- Spring MVC, Bean Validation und Spring Security mit JWT-Bearer-Tokens
-- Spring Data JPA/Hibernate, PostgreSQL und Flyway-Migrationen
-- MapStruct und Lombok für Mapping beziehungsweise Boilerplate
-- Spring AI mit OpenAI für das optionale Job-Matching
-- JUnit 5, MockMvc, Mockito und H2 für Tests
-- Docker Compose für die lokale PostgreSQL-Instanz
-
-Die Anwendung folgt einer klassischen Schichtung: Controller validieren HTTP-Anfragen, Services
-enthalten Fachlogik und Transaktionen, Repositories kapseln JPA-Zugriffe und Mapper trennen DTOs
-von Entities. Jede Firma, Bewerbung und jedes Profil ist einem Benutzer zugeordnet. Flyway ist
-Eigentümer des Schemas; Hibernate läuft mit `ddl-auto: validate` und verändert es nicht selbst.
+JobTrail folgt einer sauberen, modularen Schichtenarchitektur mit strikter Trennung von REST-Transportobjekten (DTOs), Fachlogik und JPA-Entities:
 
 ```mermaid
-flowchart LR
-    Client["API client / Swagger UI"] --> Security["Spring Security + JWT"]
-    Security --> Controller["REST controllers"]
-    Controller --> Service["Business services"]
-    Service --> Repository["Spring Data repositories"]
-    Repository --> Database[(PostgreSQL)]
-    Service --> OpenAI["OpenAI API (optional)"]
-    Flyway["Flyway migrations"] --> Database
+flowchart TD
+    subgraph ClientLayer["Clients & API Consumer"]
+        Browser["Swagger UI / Web Browser"]
+        Postman["Postman Collection"]
+        Script["Automated Demo Script (demo.ps1)"]
+    end
+
+    subgraph SecurityLayer["Security & Authentication Chain"]
+        JwtFilter["JwtAuthenticationFilter (Bearer Token)"]
+        SecurityConfig["Spring Security (Stateless / CSRF disabled)"]
+    end
+
+    subgraph PresentationLayer["Controller Layer (REST & Validation)"]
+        AuthController["AuthController (/api/auth)"]
+        CompanyController["CompanyController (/api/companies)"]
+        ApplicationController["ApplicationController (/api/applications)"]
+        ProfileController["ProfileController (/api/profiles)"]
+        JobMatchController["JobMatchController (/api/job-match)"]
+        GlobalExceptionHandler["GlobalExceptionHandler (@RestControllerAdvice)"]
+    end
+
+    subgraph BusinessLayer["Service Layer (Business Logic & Transactions)"]
+        UserService["UserService (BCrypt & User Accounts)"]
+        CompanyService["CompanyService (Ownership & Conflict Checks)"]
+        ApplicationService["ApplicationService (Optimistic Locking & Paging)"]
+        ProfileService["ProfileService (Profile & Candidate DTOs)"]
+        JobMatchService["JobMatchAiService (Prompt Sanitization & Schema Validation)"]
+        RateLimiter["JobMatchRateLimiter (In-Memory Token Bucket)"]
+    end
+
+    subgraph PersistenceLayer["Persistence Layer (Spring Data JPA)"]
+        UserRepository["UserRepository"]
+        CompanyRepository["CompanyRepository"]
+        ApplicationRepository["ApplicationRepository"]
+        StatusHistoryRepository["ApplicationStatusHistoryRepository"]
+        ProfileRepository["ProfileRepository"]
+    end
+
+    subgraph DatabaseLayer["Database & Migration"]
+        Postgres[(PostgreSQL 16 Engine)]
+        Flyway["Flyway Migrations (V1..V6)"]
+    end
+
+    subgraph ExternalLayer["External AI Provider"]
+        OpenAI["OpenAI API (GPT-4o-mini, optional)"]
+    end
+
+    Browser --> JwtFilter
+    Postman --> JwtFilter
+    Script --> JwtFilter
+    JwtFilter --> SecurityConfig
+    SecurityConfig --> PresentationLayer
+    PresentationLayer --> BusinessLayer
+    JobMatchService --> RateLimiter
+    JobMatchService -.-> OpenAI
+    BusinessLayer --> PersistenceLayer
+    PersistenceLayer --> Postgres
+    Flyway --> Postgres
 ```
 
-## Voraussetzungen
+### Schichtenverantwortlichkeiten
 
-- JDK 21 (`java -version`)
-- Docker mit Docker Compose (`docker compose version`)
-- freie Ports `5433` für PostgreSQL und `8080` für die API
+1. **Controller Layer (`com.melina.jobtrail.controller`)**:
+   - Definiert REST-Endpunkte mit OpenAPI-Annotationen (`@Operation`, `@ApiResponse`).
+   - Führt Bean Validation (`@Valid`, `@NotBlank`, `@Size`, `@URL`) auf DTOs durch.
+   - Enthält keinerlei Geschäftslogik oder Datenbankzugriffe.
+2. **Global Exception Handler (`com.melina.jobtrail.exception.GlobalExceptionHandler`)**:
+   - Wandelt alle fachlichen und technischen Ausnahmen in ein einheitliches JSON-Problem-Format (`ErrorResponse`) um.
+   - Liefert detaillierte Feldvalidierungsfehler (`fieldErrors`) bei `400 Bad Request`.
+3. **Service Layer (`com.melina.jobtrail.service`)**:
+   - Steuert Transaktionen (`@Transactional`).
+   - Garantiert **Tenant Isolation**: Jeder Benutzer hat ausschließlich Zugriff auf seine eigenen Firmen, Bewerbungen und Profile.
+   - Kapselt Statusübergänge, erzeugt unveränderliche Statushistorien und schützt über `@Version` gegen parallele Schreibkonflikte (Optimistic Locking).
+4. **Persistence Layer (`com.melina.jobtrail.repository`)**:
+   - Spring Data JPA Interfaces mit typsicheren Methoden und optimierten JPQL-Abfragen (`LEFT JOIN FETCH`) zur Vermeidung des N+1-Problems.
+   - Benutzerspezifische Indizes beschleunigen Abfragen nach Status, Datum und Firmenverknüpfungen.
+5. **Datenbank & Migrationen (`src/main/resources/db/migration`)**:
+   - Flyway verwaltet alle Schema-Änderungen versioniert und reproduzierbar (V1 bis V6).
+   - Hibernate läuft mit `ddl-auto: validate` und modifiziert die Datenbankstruktur niemals eigenständig.
 
-Eine globale Maven-Installation ist nicht nötig. Unter Windows wird `mvnw.cmd`, unter macOS/Linux
-`./mvnw` verwendet.
+---
 
-## Schnellstart mit Docker Compose (API + PostgreSQL)
+## 📋 Voraussetzungen
 
-Die gesamte Anwendung (Spring Boot API + PostgreSQL) lässt sich mit einem einzigen Befehl bauen und starten:
+Für den vollständigen Betrieb werden benötigt:
+- **Docker & Docker Compose** (Docker Desktop oder Docker Engine $\ge$ 24.x mit Compose v2)
+- **Freie Host-Ports:**
+  - `8080`: Spring Boot REST-API
+  - `5433`: PostgreSQL Host-Port (Port 5433 verhindert Konflikte mit einer bereits lokal laufenden PostgreSQL-Instanz auf 5432)
+- *(Nur für lokalen Maven-Start ohne Docker):* **JDK 21** (`java -version`). Eine globale Maven-Installation ist nicht nötig; der beiliegende Maven-Wrapper (`./mvnw` bzw. `.\mvnw.cmd`) wird verwendet.
+
+---
+
+## 🐳 Vollständiger Start mit Docker Compose
+
+Die gesamte Umgebung (Spring Boot API + PostgreSQL 16) lässt sich mit Docker Compose reproduzierbar bauen und starten.
+
+### 1. Umgebungskonfiguration vorbereiten
+
+Kopieren Sie die Vorlage [`.env.example`](.env.example) in eine lokale Datei `.env`:
+
+```powershell
+# Windows (PowerShell)
+Copy-Item .env.example .env
+
+# macOS / Linux
+cp .env.example .env
+```
+
+Die Standardwerte in `.env.example` sind sofort lokal lauffähig. Falls Sie das KI-Job-Matching nutzen möchten, tragen Sie in `.env` Ihren `OPENAI_API_KEY` ein.
+
+### 2. Container bauen und im Hintergrund starten
 
 ```powershell
 docker compose up -d --build
 ```
 
-- **API & Swagger UI:** `http://localhost:8080/swagger-ui/index.html`
-- **OpenAPI Spezifikation:** `http://localhost:8080/v3/api-docs`
-- **Postman Collection:** [`postman/`](postman/README.md) (inkl. automatischem JWT-Handshake)
-- **PostgreSQL Host-Port:** `localhost:5433`
-- **Logs einsehen:** `docker compose logs -f app`
-- **Beenden:** `docker compose down` (optional `-v` zum Zurücksetzen der Datenbank)
+Compose führt automatisch folgende Schritte aus:
+1. Startet den Container `jobtrail-postgres` mit PostgreSQL 16.
+2. Führt einen Healthcheck (`pg_isready`) durch.
+3. Baut das Multi-Stage-Docker-Image `jobtrail:local` mit Java 21.
+4. Startet den Container `jobtrail-app`, sobald die Datenbank gesund (`healthy`) ist.
+5. Flyway migriert das Schema automatisch auf die neueste Version (V1..V6).
 
-## Lokales Setup: Docker und Maven
-
-1. PostgreSQL starten:
-
-   ```powershell
-   docker compose up -d postgres
-   docker compose ps
-   ```
-
-2. Laufzeitvariablen in derselben PowerShell setzen. Der JWT-Schlüssel wird für diese Shell neu
-   erzeugt und nicht gespeichert:
-
-   ```powershell
-   $env:SPRING_PROFILES_ACTIVE = "dev"
-   $env:JWT_SECRET = [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Maximum 256 }))
-   ```
-
-   `application-dev.yml` verwendet ausschließlich lokal die Compose-Vorgaben `postgres/postgres`.
-   Diese Werte sind keine Produktionszugangsdaten. Für eine abweichende lokale Datenbank können
-   `DB_USERNAME` und `DB_PASSWORD` gesetzt werden.
-
-3. Build und Tests ohne externen KI-Aufruf ausführen:
-
-   ```powershell
-   .\mvnw.cmd clean test
-   ```
-
-4. Die API starten. Ein OpenAI-Schlüssel ist für den normalen Bewerbungstracker nicht erforderlich:
-
-   ```powershell
-   .\mvnw.cmd spring-boot:run
-   ```
-
-   Für echtes Matching wird vor dem Start zusätzlich ein gültiger Schlüssel gesetzt:
-
-   ```powershell
-   $env:OPENAI_API_KEY = "<your-api-key>"
-   .\mvnw.cmd spring-boot:run
-   ```
-
-   Die API ist anschließend unter `http://localhost:8080` erreichbar. Beenden mit `Ctrl+C`, die
-   Datenbank mit `docker compose down`. `docker compose down -v` entfernt zusätzlich alle lokalen
-   JobTrail-Daten.
-
-Die interaktive OpenAPI-Dokumentation ist unter
-`http://localhost:8080/swagger-ui/index.html` verfügbar. Registrierung und Login können dort ohne
-Token ausgeführt werden; für die übrigen Endpunkte wird der JWT über **Authorize** eingetragen.
-Die maschinenlesbare Spezifikation liegt unter `http://localhost:8080/v3/api-docs`.
-
-Auf macOS/Linux sind die entsprechenden Variablen mit `export NAME=...` zu setzen; die
-Maven-Befehle beginnen dort mit `./mvnw`.
-
-### Optional: Anwendungs-Image bauen
-
-Der Build erzeugt ein nicht privilegiert laufendes Java-21-Image:
+### 3. Status und Logs prüfen
 
 ```powershell
-docker build -t jobtrail:local .
+# Container-Status prüfen
+docker compose ps
+
+# Live-Logs der Spring Boot Anwendung einsehen
+docker compose logs -f app
 ```
 
-Das Image nutzt das Profil `prod` und erwartet PostgreSQL unter dem Hostnamen `postgres` sowie
-`DB_USERNAME`, `DB_PASSWORD` und `JWT_SECRET` als Laufzeitvariablen. Secrets gehören in eine
-Secret-Verwaltung oder die Laufzeitumgebung und niemals in Git oder in das Image.
+Sobald in den Logs `Started JobTrailApplication in ... seconds` erscheint, ist die API unter `http://localhost:8080` bereit.
 
-## Authentifizierung und Beispielzugang
+### 4. Beenden und Bereinigen
 
-Es gibt keinen vorinstallierten Benutzer. Ein reproduzierbarer Beispielzugang wird selbst über
-die API angelegt; die reservierte Domain `.invalid` vermeidet persönliche Daten:
+```powershell
+# Anwendung und Datenbank stoppen (Daten bleiben im Docker-Volume erhalten)
+docker compose down
 
+# Vollständiger Reset: Stoppt Container und löscht das Datenbank-Volume
+docker compose down -v
+```
+
+---
+
+## 💻 Lokales Entwicklungs-Setup (Docker + Maven)
+
+Für Entwickler, die den Spring Boot Server lokal im Debug-Modus ausführen möchten:
+
+1. **Nur die PostgreSQL-Datenbank im Container starten:**
+   ```powershell
+   docker compose up -d postgres
+   ```
+
+2. **Laufzeit-Umgebungsvariablen setzen & Backend starten:**
+
+   *Windows (PowerShell):*
+   ```powershell
+   $env:SPRING_PROFILES_ACTIVE = "dev"
+   $env:JWT_SECRET = "mein-super-langes-geheimes-passwort-mit-mindestens-32-zeichen"
+   .\mvnw.cmd spring-boot:run
+   ```
+
+   *macOS / Linux:*
+   ```bash
+   export SPRING_PROFILES_ACTIVE=dev
+   export JWT_SECRET="mein-super-langes-geheimes-passwort-mit-mindestens-32-zeichen"
+   ./mvnw spring-boot:run
+   ```
+
+3. **Testsuite ausführen (228 Unit-, Controller- und Service-Tests):**
+   ```powershell
+   .\mvnw.cmd test "-Dtest=ApplicationControllerTest,AuthControllerTest,CompanyControllerTest,JobMatchControllerTest,ProfileControllerTest,AccessControlSecurityWebTest,JwtAuthFilterTest,ApplicationServiceTest,CompanyServiceTest,JobMatchAiServiceTest,JobMatchRateLimiterTest,ProfileServiceTest,UserServiceTest,JwtUtilTest"
+   ```
+
+---
+
+## ⚙️ Konfiguration & Umgebungsvariablen
+
+Alle Kernparameter werden über Umgebungsvariablen gesteuert (siehe [`.env.example`](.env.example)):
+
+| Variable | Erforderlich | Standardwert | Beschreibung |
+| --- | :---: | --- | --- |
+| `POSTGRES_DB` | ja | `jobtrail` | Name der PostgreSQL-Datenbank |
+| `DB_USERNAME` | ja | `postgres` | Datenbank-Benutzername |
+| `DB_PASSWORD` | ja | `postgres_dev_password_change_in_prod` | Datenbank-Passwort |
+| `DB_PORT` | nein | `5433` | Host-Port für PostgreSQL |
+| `SERVER_PORT` | nein | `8080` | Port der Spring Boot REST-API |
+| `SPRING_PROFILES_ACTIVE` | nein | `prod` (Docker) / `dev` (Lokal) | Aktives Spring-Profil |
+| `JWT_SECRET` | ja | *(Mindestens 32 Zeichen)* | HMAC-SHA256 Signaturschlüssel für JWTs |
+| `JWT_EXPIRATION` | nein | `PT1H` (1 Stunde) | Token-Gültigkeitsdauer (ISO-8601 Dauer) |
+| `JWT_ISSUER` | nein | `jobtrail` | Erwarteter Issuer-Claim im Token |
+| `OPENAI_API_KEY` | nein | `""` (deaktiviert) | OpenAI API-Key für KI-Job-Matching |
+| `JOB_MATCH_REQUESTS_PER_MINUTE` | nein | `5` | Rate-Limit für KI-Anfragen pro Benutzer |
+| `SPRINGDOC_SWAGGER_UI_ENABLED` | nein | `true` | Aktiviert Swagger UI |
+| `SPRINGDOC_API_DOCS_ENABLED` | nein | `true` | Aktiviert OpenAPI v3 JSON-Spezifikation |
+
+---
+
+## 🔐 Authentifizierung & API-Workflow
+
+Die Authentifizierung erfolgt stateless über JWT Bearer Tokens. Nach Registrierung und Login wird das erhaltene Token im HTTP-Header mitgesendet:
+`Authorization: Bearer <TOKEN>`
+
+### 1. Registrierung & Login
+
+**Registrierung:**
 ```http
 POST /api/auth/register
 Content-Type: application/json
 
 {
-  "email": "demo@example.invalid",
-  "password": "change-me-123"
+  "email": "candidate@example.invalid",
+  "password": "secure-password-123"
+}
+```
+*Antwort (`201 Created`):*
+```json
+{
+  "id": 1,
+  "email": "candidate@example.invalid",
+  "createdAt": "2026-10-27T20:00:00Z"
 }
 ```
 
-Danach liefert der Login den JWT als reinen Text. Er ist eine Stunde gültig:
-
+**Login:**
 ```http
 POST /api/auth/login
 Content-Type: application/json
 
 {
-  "email": "demo@example.invalid",
-  "password": "change-me-123"
+  "email": "candidate@example.invalid",
+  "password": "secure-password-123"
 }
 ```
+*Antwort (`200 OK`):*
+Gibt den signierten JWT als reinen Text (`text/plain`) zurück.
 
-Alle folgenden Routen erwarten `Authorization: Bearer <TOKEN>`. `GET /api/auth/me` liefert den
-aktuell angemeldeten Benutzer. Nur Registrierung und Login sind öffentlich. Die Beispielwerte
-sind ausschließlich für lokale Entwicklung gedacht.
-
-## API-Überblick
-
-### Reproduzierbarer Demo-Flow
-
-Bei laufender lokaler API spielt das Skript Registrierung, Login, Firma und Bewerbung anlegen,
-Liste, Filter, Update, Statuswechsel, Historie und Löschen vollständig durch. Es erzeugt pro Lauf
-einen neuen anonymen Benutzer unter der reservierten Domain `.invalid`, prüft alle wesentlichen
-Antworten und beendet sich beim ersten Fehler:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\demo.ps1
+**Aktuellen Benutzer abrufen:**
+```http
+GET /api/auth/me
+Authorization: Bearer <TOKEN>
 ```
 
-Für eine andere Umgebung kann die Basis-URL übergeben werden:
+---
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\demo.ps1 -BaseUrl "http://localhost:8080"
-```
+### 2. Typischer End-to-End API-Ablauf
 
-### Postman Collection
-
-Eine vollständige Postman Collection für alle Endpunkte (inklusive automatischem JWT-Handshake und Beispieldaten) steht im Ordner [`postman/`](postman/README.md) bereit:
-- Collection: [`postman/JobTrail.postman_collection.json`](postman/JobTrail.postman_collection.json)
-- Environment: [`postman/JobTrail.postman_environment.json`](postman/JobTrail.postman_environment.json)
-
-Nach dem Import kann über `1. Authentication > 1-Klick Demo-Login` sofort ein Test-Token bezogen werden, das automatisch in der Collection-Variable `{{token}}` gespeichert wird.
-
-### Firmen
-
+#### Schritt 1: Firma anlegen
 ```http
 POST /api/companies
 Authorization: Bearer <TOKEN>
 Content-Type: application/json
 
 {
-  "name": "Example GmbH",
+  "name": "CloudTech Solutions GmbH",
   "website": "https://example.com",
-  "location": "Berlin"
+  "location": "Berlin / Remote"
 }
 ```
+*Antwort (`201 Created`):* Liefert die ID der neu erstellten Firma (z. B. `{"id": 42, ...}`).
 
-- `GET /api/companies` – eigene Firmen auflisten
-- `GET /api/companies/{id}` – Firma abrufen
-- `PUT /api/companies/{id}` – Firma mit demselben JSON-Format ersetzen
-- `DELETE /api/companies/{id}` – Firma löschen
-
-Eine Firma, auf die noch Bewerbungen verweisen, kann nicht gelöscht werden. Die API liefert dafür
-einen fachlichen `409 Conflict`; zuerst müssen die betreffenden Bewerbungen entfernt werden.
-
-### Bewerbungen
-
-Die `companyId` stammt aus der Antwort von `POST /api/companies`. Beim Anlegen setzt der Server
-den Status immer auf `SAVED`. Create- und Update-Requests akzeptieren bewusst kein `status`-Feld;
-unbekannte Felder werden mit `400 Bad Request` abgelehnt.
-
+#### Schritt 2: Bewerbung erfassen
+Der Anfangsstatus wird vom Server immer atomar auf `SAVED` gesetzt:
 ```http
 POST /api/applications
 Authorization: Bearer <TOKEN>
 Content-Type: application/json
 
 {
-  "positionTitle": "Backend Developer",
-  "companyId": 1,
-  "applicationDate": "2026-07-05",
-  "jobUrl": "https://example.com/jobs/backend"
+  "positionTitle": "Senior Java Backend Engineer",
+  "companyId": 42,
+  "applicationDate": "2026-10-27",
+  "jobUrl": "https://example.com/jobs/java-senior"
 }
 ```
+*Antwort (`201 Created`):* Liefert die Bewerbung mit `status: "SAVED"`.
 
-- `GET /api/applications` – paginierte Liste; optionale Parameter: `page`, `size`, `sortBy`,
-  `direction`, `status`, `companyId`, `applicationDateFrom`, `applicationDateTo`
-- `GET /api/applications/{id}` – Bewerbung abrufen
-- `PUT /api/applications/{id}` – fachliche Bewerbungsdaten vollständig aktualisieren; der Status
-  bleibt unverändert
-- `DELETE /api/applications/{id}` – Bewerbung löschen
-- `GET /api/applications/{id}/status-history` – chronologische Statushistorie
+#### Schritt 3: Bewerbungen filtern, sortieren & paginieren
+```http
+GET /api/applications?status=SAVED&companyId=42&sortBy=applicationDate&direction=desc&page=0&size=10
+Authorization: Bearer <TOKEN>
+```
+*Antwort (`200 OK`):* Liefert ein Page-Objekt mit `content`, `page`, `size`, `totalElements` und `totalPages`.
 
-Statusänderungen sind ausschließlich über den dedizierten PATCH-Endpunkt möglich, damit jeder
-echte Übergang atomar in der Statushistorie gespeichert wird:
-
+#### Schritt 4: Statuswechsel durchführen
+Statusübergänge erfolgen ausschließlich über den dedizierten PATCH-Endpunkt, um die Nachvollziehbarkeit sicherzustellen:
 ```http
 PATCH /api/applications/1/status
 Authorization: Bearer <TOKEN>
 Content-Type: application/json
 
-{ "status": "INTERVIEW_SCHEDULED" }
+{
+  "status": "INTERVIEW_SCHEDULED"
+}
+```
+*Erlaubte Statuswerte:* `SAVED` $\rightarrow$ `APPLIED` $\rightarrow$ `UNDER_REVIEW` $\rightarrow$ `INTERVIEW_SCHEDULED` $\rightarrow$ `INTERVIEW_COMPLETED` $\rightarrow$ `OFFER_RECEIVED` $\rightarrow$ `ACCEPTED`, `REJECTED`, `WITHDRAWN`.
+
+#### Schritt 5: Auditierbare Statushistorie abrufen
+```http
+GET /api/applications/1/status-history
+Authorization: Bearer <TOKEN>
+```
+*Antwort (`200 OK`):*
+```json
+[
+  {
+    "id": 1,
+    "oldStatus": null,
+    "newStatus": "SAVED",
+    "changedAt": "2026-10-27T20:05:00Z"
+  },
+  {
+    "id": 2,
+    "oldStatus": "SAVED",
+    "newStatus": "INTERVIEW_SCHEDULED",
+    "changedAt": "2026-10-27T20:10:00Z"
+  }
+]
 ```
 
-Erlaubte Statuswerte sind `SAVED`, `APPLIED`, `UNDER_REVIEW`, `INTERVIEW_SCHEDULED`,
-`INTERVIEW_COMPLETED`, `OFFER_RECEIVED`, `REJECTED`, `ACCEPTED` und `WITHDRAWN`.
-
-### Profil
-
-Pro Benutzer existiert höchstens ein Profil. `PUT /api/profiles` erwartet wie `POST` immer das
-vollständige Profil.
-
+#### Schritt 6: Bewerberprofil für KI-Matching pflegen
 ```http
 POST /api/profiles
 Authorization: Bearer <TOKEN>
@@ -275,136 +359,99 @@ Content-Type: application/json
 
 {
   "targetRole": "Java Backend Developer",
-  "locationPreference": "Berlin oder remote",
+  "locationPreference": "Berlin / Remote",
   "availability": "ab sofort",
-  "experienceLevel": "JUNIOR",
-  "summary": "Fokus auf robuste Web-APIs",
-  "skills": [{ "name": "Java", "level": "PROFICIENT", "mainSkill": true }],
-  "languages": [{ "language": "Deutsch", "level": "FLUENT" }],
+  "experienceLevel": "MID_LEVEL",
+  "summary": "Fokus auf hochperformante Spring-Boot-Architekturen",
+  "skills": [
+    { "name": "Java", "level": "EXPERT", "mainSkill": true },
+    { "name": "Spring Boot", "level": "PROFICIENT", "mainSkill": true },
+    { "name": "PostgreSQL", "level": "PROFICIENT", "mainSkill": true }
+  ],
+  "languages": [
+    { "language": "Deutsch", "level": "NATIVE" },
+    { "language": "Englisch", "level": "FLUENT" }
+  ],
   "projects": [],
-  "preferredRoles": ["Backend Developer"],
-  "avoidKeywords": ["unbezahltes Praktikum"]
+  "preferredRoles": ["Backend Developer", "Software Architect"],
+  "avoidKeywords": ["unbezahltes Praktikum", "On-Call 24/7"]
 }
 ```
 
-- `GET /api/profiles` – eigenes Profil abrufen
-- `PUT /api/profiles` – eigenes Profil vollständig ersetzen
-- `DELETE /api/profiles` – eigenes Profil löschen
-
-### KI-Job-Matching
-
-Hierfür müssen ein Profil und ein gültiger `OPENAI_API_KEY` vorhanden sein. Ohne Schlüssel startet
-die restliche API normal; ein Matching-Aufruf liefert dann `503 Service Unavailable`.
-
-#### Realistisches Beispiel
-
-**Request:**
-
+#### Schritt 7: KI-Job-Matching ausführen
 ```http
 POST /api/job-match/analyze
 Authorization: Bearer <TOKEN>
 Content-Type: application/json
 
 {
-  "description": "Wir suchen eine/n Java Backend Entwickler/in (m/w/d) in Berlin oder Remote. Aufgaben: Konzeption und Entwicklung robuster REST-APIs mit Java 21 und Spring Boot, Anbindung von PostgreSQL-Datenbanken via Hibernate/JPA, Containerisierung mit Docker. Anforderungen: Fundierte Kenntnisse in Java, Spring Boot und relationalen Datenbanken. Erfahrung mit Docker und CI/CD erwünscht. Deutsch fließend, Englisch verhandlungssicher. Kein unbezahltes Praktikum."
+  "description": "Gesucht: Senior Java Entwickler (m/w/d). Aufgaben: Entwicklung modularer Microservices mit Java 21, Spring Boot und PostgreSQL. Erfahrung mit Docker und CI/CD gewünscht. Deutsch verhandlungssicher."
 }
 ```
-
-**Erfolgreiche Antwort (`200 OK`):**
-
+*Antwort (`200 OK`):*
 ```json
 {
   "score": 88,
-  "matchingSkills": [
-    "Java",
-    "Spring Boot",
-    "PostgreSQL",
-    "REST-APIs"
-  ],
-  "missingSkills": [
-    "Docker",
-    "CI/CD"
-  ],
+  "matchingSkills": ["Java", "Spring Boot", "PostgreSQL"],
+  "missingSkills": ["Docker", "CI/CD"],
   "recommendation": "APPLY",
-  "summary": "Das Bewerberprofil passt hervorragend zu den Kernanforderungen der Position als Java Backend Entwickler. Die geforderten Technologien Java, Spring Boot und relationale Datenbanken werden vollumfänglich abgedeckt. Für Docker und CI/CD sind Entwicklungspotenziale vorhanden, die jedoch bei der vorhandenen Seniorität schnell aufgebaut werden können. Standort und Sprachkenntnisse stimmen überein."
+  "summary": "Das Bewerberprofil passt hervorragend zu den Kernanforderungen der Position. Die Kerntechnologien Java, Spring Boot und PostgreSQL werden vollständig abgedeckt. Die geforderten Sprachkenntnisse stimmen überein."
 }
 ```
 
-#### Bewertungsrubrik & Validierung
+---
 
-Das System erzwingt eine strikte Korrelation zwischen Punktwert und Empfehlung:
-- **80–100 (`APPLY`)**: Der Bewerber deckt alle Kerntechnologien und Pflichtkriterien ab; Seniorität und Rahmenbedingungen stimmen überein.
-- **50–79 (`MAYBE`)**: Der Bewerber erfüllt die meisten Kernskills, weist jedoch kleinere Lücken bei Sekundäranforderungen oder optionalen Tools auf.
-- **0–49 (`DO_NOT_APPLY`)**: Erhebliche Abweichungen im Tech-Stack, mangelnde Erfahrung oder Auftreten von Begriffen aus den persönlichen `avoidKeywords` des Profils.
+## 🛡️ Einheitliche Fehlerbehandlung
 
-Widersprüchliche KI-Rückmeldungen (z. B. Score 90 bei gleichzeitiger `DO_NOT_APPLY`-Empfehlung) oder unvollständige JSON-Payloads werden clientseitig strikt als Schema-Validierungsfehler verworfen.
+Alle Fehler werden zentral von [`GlobalExceptionHandler`](src/main/java/com/melina/jobtrail/exception/GlobalExceptionHandler.java) in einem konsistenten JSON-Format zurückgegeben:
 
-#### Fehlerbehandlung & HTTP-Statuscodes
-
-| Statuscode | Ursache | Verhalten & Antwort |
-| --- | --- | --- |
-| `400 Bad Request` | Leere oder fehlende `description` | Bean Validation meldet detaillierten Feldfehler. |
-| `404 Not Found` | Benutzer hat noch kein Profil | Hinweis, zuerst `POST /api/profiles` auszuführen. |
-| `429 Too Many Requests` | Rate-Limit überschritten | Standardmäßig maximal 5 Anfragen pro Minute je Benutzer (`JOB_MATCH_REQUESTS_PER_MINUTE`). |
-| `502 Bad Gateway` | Providerfehler, JSON-Parse-Fehler, Schemaabweichung oder Timeout | Transparente Fehlermeldung; schützt die Anwendung vor fehlerhaften LLM-Antworten. |
-| `503 Service Unavailable` | Kein `OPENAI_API_KEY` gesetzt | KI-Feature ist sauber deaktiviert; Kernanwendung bleibt voll einsatzfähig. |
-
-#### Datenintegrität & Transaktionssicherheit
-
-Der Matching-Endpunkt ist eine **rein lesende Operation**:
-- Es werden ausschließlich das Profil des authentifizierten Benutzers und die übergebene Stellenbeschreibung ausgewertet.
-- Es erfolgen keinerlei Schreibzugriffe auf die Datenbank.
-- Im Fehlerfall (Timeouts, Parse-Fehler, Rate-Limits) verbleiben weder verwaiste Datensätze noch inkonsistente Zwischenzustände.
-
-#### Grenzen und Einschränkungen des Matchings
-
-- **Reine Orientierungs- und Entscheidungshilfe**: Das Matching analysiert Übereinstimmungen heuristisch; es ersetzt weder das sorgfältige Lesen der Stellenanzeige noch führt es automatisierte Bewerbungsaktionen aus.
-- **Halluzinationsrisiko**: Sprachmodelle können Anforderungen über- oder unterinterpretieren. Die Begründungen und Skill-Listen sind unverbindlich und müssen eigenverantwortlich geprüft werden.
-- **Sprachkonsistenz**: Die Zusammenfassung (`summary`) wird dynamisch in der Sprache der Stellenanzeige generiert (z. B. Deutsch oder Englisch).
-- **Datensparsamkeit**: Es werden nur strukturierte Profildaten (Kenntnisse, Seniorität, Präferenzen) und die Stellenbeschreibung an die OpenAI-Schnittstelle übertragen; sensible Daten wie Passwörter oder unbeteiligte Firmendaten werden niemals übermittelt.
-- **Rate-Limiting**: Das lokale In-Memory-Rate-Limiting schützt vor unkontrollierten API-Kosten. Bei horizontal skalierenden Deployments sollte die Begrenzung auf Redis oder das API-Gateway ausgelagert werden.
-
-## Konfiguration und Secrets
-
-| Variable | Erforderlich | Zweck |
-| --- | --- | --- |
-| `JWT_SECRET` | ja | HMAC-Schlüssel für JWT; mindestens 32 zufällige Bytes empfohlen |
-| `JWT_EXPIRATION` | nein | Token-Laufzeit als ISO-8601-Dauer, Standard `PT1H` |
-| `JWT_ISSUER` | nein | erwarteter JWT-Aussteller, Standard `jobtrail` |
-| `OPENAI_API_KEY` | nur für Matching | Zugang zum OpenAI-Modell |
-| `DB_USERNAME` | Produktion/optional lokal | PostgreSQL-Benutzer |
-| `DB_PASSWORD` | Produktion/optional lokal | PostgreSQL-Passwort |
-| `JOB_MATCH_REQUESTS_PER_MINUTE` | nein | Matching-Limit, Standard `5` |
-
-Es werden keine echten Schlüssel, Tokens oder persönlichen Zugangsdaten im Repository erwartet.
-Die Datei `.env` ist ignoriert; sensible Werte bleiben in der Umgebung oder Secret-Verwaltung.
-Zu kurze JWT-Schlüssel sowie ungültige Laufzeiten oder leere Issuer werden bereits beim Start
-abgelehnt. Ausgestellte Tokens enthalten den konfigurierten Issuer und werden dagegen validiert.
-
-## Teststrategie
-
-```powershell
-.\mvnw.cmd test
+```json
+{
+  "timestamp": "2026-10-27T20:30:00Z",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Validation failed",
+  "fieldErrors": {
+    "positionTitle": "Position title cannot be null or blank",
+    "companyId": "Company ID must be provided"
+  }
+}
 ```
 
-- Unit-Tests isolieren Services, Security-Helfer und KI-Integration mit Mockito.
-- MVC-Tests prüfen Routing, Validierung, Authentifizierung und stabile Fehlerformate.
-- Repository- und Transaktionstests verwenden lokal H2 und echte Flyway-Migrationen. Die
-  GitHub-Actions-Pipeline überschreibt die Test-Datasource mit einem PostgreSQL-16-Service und
-  validiert dieselbe Suite zusätzlich gegen die produktionsnahe Datenbank-Engine.
-- API-Integrationstests decken den vollständigen JWT-Pfad sowie Benutzerisolation ab.
-- Integrationstests prüfen, dass `PUT` keine Statushistorie umgehen kann, referenzierte Firmen
-  nicht gelöscht werden und die Anwendung ohne OpenAI-Schlüssel startet.
-- Der echte OpenAI-Integrationstest ist standardmäßig deaktiviert. Er läuft nur, wenn vor dem
-  Testlauf sowohl ein gültiger `OPENAI_API_KEY` als auch
-  `RUN_OPENAI_INTEGRATION_TESTS=true` gesetzt sind. Normale Testläufe senden keine externen
-  Requests.
+### Übersicht der HTTP-Statuscodes
 
-Wichtige Designentscheidungen: JWT hält die API zustandslos, Flyway versioniert das Schema, DTOs
-verhindern das Offenlegen von Entities, und Datenbank-Constraints bleiben die letzte Instanz für
-Invarianten. Für Bewerbungsduplikate gibt es zusätzlich einen lesbaren Repository-Vorabcheck;
-parallele Constraint-Verletzungen werden ebenfalls auf denselben fachlichen `409`-Fehler abgebildet.
-Ein optimistisches Versionsfeld verhindert verlorene parallele Bewerbungsupdates. Indizes für die
-häufigsten benutzerspezifischen Status-, Datums- und Sortierabfragen sowie ein gezieltes Laden der
-zugehörigen Firma reduzieren unnötige Datenbankarbeit. Im Produktionsprofil sind Swagger UI und
-die OpenAPI-Spezifikation deaktiviert.
+| Statuscode | Typische Ursache | Beispielmeldung |
+| --- | --- | --- |
+| `400 Bad Request` | Fehlende Pflichtfelder, falsche Datentypen oder ungültige Paginierung | `Validation failed` (mit detaillierten `fieldErrors`) |
+| `401 Unauthorized` | Kein, falscher oder abgelaufener JWT Bearer Token | `Unauthorized` |
+| `403 Forbidden` | Versuch, auf fremde Daten zuzugreifen | `Access Denied` |
+| `404 Not Found` | Angefragte ID existiert nicht oder gehört einem anderen Nutzer | `Application with id 99 not found` |
+| `409 Conflict` | Duplikat (gleiche Firma + Titel) oder Löschen einer referenzierten Firma | `Company with id 42 cannot be deleted while applications reference it` |
+| `429 Too Many Requests` | KI-Matching Rate-Limit überschritten | `AI job matching rate limit exceeded` |
+| `502 Bad Gateway` | OpenAI-Providerfehler, Timeout oder ungültige LLM-Antwort | `AI service is temporarily unavailable` / `Failed to parse AI response` |
+| `503 Service Unavailable` | KI-Matching aufgerufen, obwohl kein `OPENAI_API_KEY` gesetzt ist | `AI job matching is not configured` |
+
+---
+
+## 🧪 CI/CD & Teststrategie
+
+JobTrail wird über eine automatisierte GitHub Actions CI-Pipeline ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) bei jedem Push und Pull Request geprüft.
+
+```powershell
+.\mvnw.cmd verify
+```
+
+- **Unit-Tests:** Isolieren Services, Mapper, JWT-Validierung und KI-Rate-Limiter mit Mockito.
+- **Controller-Tests:** Testen Routing, Bean Validation, Statuscodes und das einheitliche `ErrorResponse`-Format via `MockMvc`.
+- **Datenbank- & Migrationstests:** Testcontainers startet eine echte PostgreSQL-16-Instanz und validiert Flyway-Migrationen (V1..V6).
+- **Security- & Access-Control-Tests:** Verifizieren strikte Benutzerisolation (kein Cross-User-Data-Leakage) und Token-Abläufe.
+- **KI-Resilienz-Tests:** 29 dedizierte Tests in `JobMatchAiServiceTest` decken ungültige JSON-Antworten, fehlende Felder, widersprüchliche Bewertungsrubriken, Timeouts und Providerfehler ab.
+
+---
+
+## ⚠️ Bekannte Einschränkungen & MVP-Grenzen
+
+- **Reine Backend-API:** Das Projekt stellt eine zustandslose REST-API bereit. Ein Frontend (z. B. React/Vue/Angular) kann über die dokumentierten JSON-Endpunkte angebunden werden.
+- **Kein E-Mail-Versand / Passwort-Reset:** Registrierung und Login laufen direkt über die API ohne SMTP-Verifikation.
+- **In-Memory Rate Limiting:** Das Token-Bucket-Rate-Limiting für KI-Anfragen läuft im Arbeitsspeicher der App-Instanz. Bei horizontaler Skalierung sollte Redis oder ein API-Gateway genutzt werden.
+- **Optionale KI-Abhängigkeit:** Das KI-Job-Matching ist eine optionale Entscheidungshilfe. Ohne `OPENAI_API_KEY` bleibt der gesamte Kern (Firmen, Bewerbungen, Statushistorie, Profile) uneingeschränkt nutzbar.
