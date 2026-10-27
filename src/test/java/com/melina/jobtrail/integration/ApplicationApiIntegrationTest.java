@@ -251,6 +251,42 @@ class ApplicationApiIntegrationTest extends AbstractPostgresCleanIntegrationTest
                 );
     }
 
+    @Test
+    void getApplications_withInvalidSortField_returnsBadRequest() throws Exception {
+        mockMvc.perform(authenticated(get("/api/applications").param("sortBy", "malicious_column"), ownerAuthentication))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.error").value("Bad Request"),
+                        jsonPath("$.message", org.hamcrest.Matchers.startsWith("Invalid sortBy value"))
+                );
+    }
+
+    @Test
+    void getApplications_withReversedDateRange_returnsBadRequest() throws Exception {
+        mockMvc.perform(authenticated(
+                        get("/api/applications")
+                                .param("applicationDateFrom", "2026-12-01")
+                                .param("applicationDateTo", "2026-01-01"),
+                        ownerAuthentication
+                ))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.message").value("applicationDateFrom must not be after applicationDateTo")
+                );
+    }
+
+    @Test
+    void getApplications_withInvalidPagination_returnsBadRequest() throws Exception {
+        mockMvc.perform(authenticated(get("/api/applications").param("page", "-1"), ownerAuthentication))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.message").value("Invalid pagination parameters")
+                );
+    }
+
     private User saveUser(String email) {
         return userRepository.save(User.builder()
                 .email(email)
