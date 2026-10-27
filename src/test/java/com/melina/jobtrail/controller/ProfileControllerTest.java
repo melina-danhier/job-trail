@@ -1,10 +1,15 @@
 package com.melina.jobtrail.controller;
 
+import com.melina.jobtrail.dto.profile.ProfileLanguageRequest;
+import com.melina.jobtrail.dto.profile.ProfileProjectRequest;
 import com.melina.jobtrail.dto.profile.ProfileRequest;
 import com.melina.jobtrail.dto.profile.ProfileResponse;
+import com.melina.jobtrail.dto.profile.ProfileSkillRequest;
+import com.melina.jobtrail.exception.ProfileAlreadyExistsException;
 import com.melina.jobtrail.exception.ProfileNotFoundException;
 import com.melina.jobtrail.service.ProfileService;
 import com.melina.jobtrail.util.ExperienceLevel;
+import com.melina.jobtrail.util.SkillLevel;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -38,6 +43,24 @@ class ProfileControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    void createProfile_withMissingRequiredFields_returnsBadRequestAndFieldErrors() throws Exception {
+        String json = "{}";
+
+        mockMvc.perform(post("/api/profiles").contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.error").value("Bad Request"),
+                        jsonPath("$.message").value("Validation failed"),
+                        jsonPath("$.fieldErrors.targetRole").value("Target role cannot be null or blank"),
+                        jsonPath("$.fieldErrors.locationPreference").value("Location preference cannot be null or blank"),
+                        jsonPath("$.fieldErrors.availability").value("Availability cannot be null or blank"),
+                        jsonPath("$.fieldErrors.experienceLevel").value("Experience level cannot be null")
+                );
+        verifyNoInteractions(profileService);
+    }
+
+    @Test
     void createProfile_withInvalidNestedSkill_returnsBadRequest() throws Exception {
         String json = """
                 {"targetRole":"Backend Developer","locationPreference":"Berlin",
@@ -46,8 +69,64 @@ class ProfileControllerTest extends AbstractControllerTest {
                 """;
 
         mockMvc.perform(post("/api/profiles").contentType(MediaType.APPLICATION_JSON).content(json))
-                .andExpectAll(status().isBadRequest(), jsonPath("$.message").value("Validation failed"));
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.message").value("Validation failed"),
+                        jsonPath("$.fieldErrors['skills[0].name']").value("Skill name cannot be null or blank")
+                );
         verifyNoInteractions(profileService);
+    }
+
+    @Test
+    void createProfile_withInvalidNestedLanguage_returnsBadRequest() throws Exception {
+        String json = """
+                {"targetRole":"Backend Developer","locationPreference":"Berlin",
+                 "availability":"Immediately","experienceLevel":"MID",
+                 "languages":[{"language":"","level":"FLUENT"}]}
+                """;
+
+        mockMvc.perform(post("/api/profiles").contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.message").value("Validation failed"),
+                        jsonPath("$.fieldErrors['languages[0].language']").value("Language name cannot be null or blank")
+                );
+        verifyNoInteractions(profileService);
+    }
+
+    @Test
+    void createProfile_withInvalidNestedProject_returnsBadRequest() throws Exception {
+        String json = """
+                {"targetRole":"Backend Developer","locationPreference":"Berlin",
+                 "availability":"Immediately","experienceLevel":"MID",
+                 "projects":[{"name":"","description":"Short"}]}
+                """;
+
+        mockMvc.perform(post("/api/profiles").contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.message").value("Validation failed"),
+                        jsonPath("$.fieldErrors['projects[0].name']").value("Project name cannot be null or blank")
+                );
+        verifyNoInteractions(profileService);
+    }
+
+    @Test
+    void createProfile_whenProfileAlreadyExists_returnsConflict() throws Exception {
+        when(profileService.createProfile(eq("user@example.com"), any()))
+                .thenThrow(new ProfileAlreadyExistsException());
+
+        mockMvc.perform(post("/api/profiles").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpectAll(
+                        status().isConflict(),
+                        jsonPath("$.status").value(409),
+                        jsonPath("$.error").value("Conflict"),
+                        jsonPath("$.message").value("Profile already exists")
+                );
     }
 
     @Test
@@ -55,7 +134,12 @@ class ProfileControllerTest extends AbstractControllerTest {
         when(profileService.getProfile("user@example.com")).thenThrow(new ProfileNotFoundException());
 
         mockMvc.perform(get("/api/profiles"))
-                .andExpectAll(status().isNotFound(), jsonPath("$.message").value("Profile not found"));
+                .andExpectAll(
+                        status().isNotFound(),
+                        jsonPath("$.status").value(404),
+                        jsonPath("$.error").value("Not Found"),
+                        jsonPath("$.message").value("Profile not found")
+                );
     }
 
     @Test
@@ -68,9 +152,37 @@ class ProfileControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    void updateProfile_whenProfileDoesNotExist_returnsNotFound() throws Exception {
+        when(profileService.updateProfile(eq("user@example.com"), any()))
+                .thenThrow(new ProfileNotFoundException());
+
+        mockMvc.perform(put("/api/profiles").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpectAll(
+                        status().isNotFound(),
+                        jsonPath("$.status").value(404),
+                        jsonPath("$.error").value("Not Found"),
+                        jsonPath("$.message").value("Profile not found")
+                );
+    }
+
+    @Test
     void deleteProfile_returnsNoContent() throws Exception {
         mockMvc.perform(delete("/api/profiles")).andExpect(status().isNoContent());
         verify(profileService).deleteProfile("user@example.com");
+    }
+
+    @Test
+    void deleteProfile_whenProfileDoesNotExist_returnsNotFound() throws Exception {
+        doThrow(new ProfileNotFoundException()).when(profileService).deleteProfile("user@example.com");
+
+        mockMvc.perform(delete("/api/profiles"))
+                .andExpectAll(
+                        status().isNotFound(),
+                        jsonPath("$.status").value(404),
+                        jsonPath("$.error").value("Not Found"),
+                        jsonPath("$.message").value("Profile not found")
+                );
     }
 
     private ProfileRequest validRequest() {

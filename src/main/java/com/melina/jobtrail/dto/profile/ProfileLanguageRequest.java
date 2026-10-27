@@ -10,12 +10,12 @@ import jakarta.validation.constraints.Size;
 public record ProfileLanguageRequest(
 
         @Schema(description = "Bezeichnung der Sprache", example = "Deutsch")
-        @NotBlank
-        @Size(max = 50)
+        @NotBlank(message = "Language name cannot be null or blank")
+        @Size(max = 50, message = "Language name must not exceed 50 characters")
         String language,
 
         @Schema(description = "Sprachniveau (BASIC, INTERMEDIATE, ADVANCED, FLUENT, NATIVE)", example = "FLUENT")
-        @NotNull
+        @NotNull(message = "Language level cannot be null")
         LanguageLevel level
 ) {
 }

@@ -179,6 +179,8 @@ public class ApplicationController {
             @ApiResponse(responseCode = "401", description = "Nicht authentifiziert",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Bewerbung oder Unternehmen nicht gefunden",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "Bewerbung für diese Position und dieses Unternehmen existiert bereits",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     })
     public ResponseEntity<ApplicationResponse> updateApplication(

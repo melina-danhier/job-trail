@@ -11,8 +11,8 @@ public record JobMatchRequest (
                 description = "Vollständiger Text oder Auszug der Stellenanzeige",
                 example = "Wir suchen einen Senior Java Backend Entwickler mit mindestens 5 Jahren Erfahrung in Java, Spring Boot, REST APIs und Docker. Kubernetes-Kenntnisse von Vorteil."
         )
-        @NotBlank
-        @Size(max = 12000)
+        @NotBlank(message = "Job description cannot be null or blank")
+        @Size(max = 12000, message = "Job description must not exceed 12000 characters")
         String description
 ) {
 }

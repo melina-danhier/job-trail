@@ -46,6 +46,7 @@ class OpenApiIntegrationTest extends AbstractPostgresIntegrationTest {
                 jsonPath("$.paths['/api/applications'].post.responses['201']").exists(),
                 jsonPath("$.paths['/api/applications'].post.responses['400']").exists(),
                 jsonPath("$.paths['/api/applications'].post.responses['409']").exists(),
+                jsonPath("$.paths['/api/applications/{id}'].put.responses['409']").exists(),
                 jsonPath("$.paths['/api/applications/{id}'].delete.responses['204']").exists(),
 
                 // Status Codes on Job Match (including AI-specific codes)

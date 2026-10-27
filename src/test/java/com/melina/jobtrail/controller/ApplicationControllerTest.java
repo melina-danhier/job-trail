@@ -8,6 +8,7 @@ import com.melina.jobtrail.dto.application.ApplicationStatusHistoryResponse;
 import com.melina.jobtrail.dto.application.ApplicationUpdateRequest;
 import com.melina.jobtrail.dto.application.ApplicationUpdateStatusRequest;
 import com.melina.jobtrail.exception.ApplicationNotFoundException;
+import com.melina.jobtrail.exception.DuplicateApplicationException;
 import com.melina.jobtrail.service.ApplicationService;
 import com.melina.jobtrail.util.ApplicationStatus;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,69 @@ class ApplicationControllerTest extends AbstractControllerTest {
         ).andExpect(status().isBadRequest());
 
         verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void createApplication_withMissingCompanyId_returnsBadRequestAndFieldErrors() throws Exception {
+        mvcWithRequest(
+                post("/api/applications"),
+                "{\"positionTitle\": \"Backend Developer\"}"
+        ).andExpectAll(
+                status().isBadRequest(),
+                jsonPath("$.status").value(400),
+                jsonPath("$.error").value("Bad Request"),
+                jsonPath("$.message").value("Validation failed"),
+                jsonPath("$.fieldErrors.companyId").value("Company ID cannot be null")
+        );
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void createApplication_withBlankPositionTitle_returnsBadRequestAndFieldErrors() throws Exception {
+        mvcWithRequest(
+                post("/api/applications"),
+                "{\"positionTitle\": \"   \", \"companyId\": 1}"
+        ).andExpectAll(
+                status().isBadRequest(),
+                jsonPath("$.status").value(400),
+                jsonPath("$.message").value("Validation failed"),
+                jsonPath("$.fieldErrors.positionTitle").value("Position title cannot be null or blank")
+        );
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void createApplication_withInvalidJobUrl_returnsBadRequestAndFieldErrors() throws Exception {
+        mvcWithRequest(
+                post("/api/applications"),
+                "{\"positionTitle\": \"Java Developer\", \"companyId\": 1, \"jobUrl\": \"not-a-valid-url\"}"
+        ).andExpectAll(
+                status().isBadRequest(),
+                jsonPath("$.status").value(400),
+                jsonPath("$.message").value("Validation failed"),
+                jsonPath("$.fieldErrors.jobUrl").value("Invalid job URL format")
+        );
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void createApplication_whenDuplicatePositionAndCompany_returnsConflict() throws Exception {
+        ApplicationCreateRequest request = createRequest("Senior Developer");
+        when(applicationService.createApplication(anyString(), eq(request)))
+                .thenThrow(new DuplicateApplicationException());
+
+        mvcWithRequest(
+                post("/api/applications"),
+                objectMapper.writeValueAsString(request)
+        ).andExpectAll(
+                status().isConflict(),
+                jsonPath("$.status").value(409),
+                jsonPath("$.error").value("Conflict"),
+                jsonPath("$.message").value("An application for this company and position already exists")
+        );
     }
 
     @Test
@@ -156,7 +220,35 @@ class ApplicationControllerTest extends AbstractControllerTest {
     @Test
     void getApplications_withOversizedPage_returnsBadRequest() throws Exception {
         mockMvc.perform(get("/api/applications").param("size", "101"))
-                .andExpect(status().isBadRequest());
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.message").value("Invalid pagination parameters")
+                );
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void getApplications_withNegativePage_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/applications").param("page", "-1"))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.message").value("Invalid pagination parameters")
+                );
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void getApplications_withZeroPageSize_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/applications").param("size", "0"))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.message").value("Invalid pagination parameters")
+                );
 
         verifyNoInteractions(applicationService);
     }
@@ -167,6 +259,40 @@ class ApplicationControllerTest extends AbstractControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void getApplications_withInvalidSortField_returnsBadRequest() throws Exception {
+        when(applicationService.getApplications(
+                anyString(), anyInt(), anyInt(), eq("invalidField"), any(),
+                any(), any(), any(), any()
+        )).thenThrow(new IllegalArgumentException("Invalid sortBy value. Allowed values: createdAt, updatedAt, applicationDate, positionTitle, status"));
+
+        mockMvc.perform(get("/api/applications").param("sortBy", "invalidField"))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.error").value("Bad Request"),
+                        jsonPath("$.message").value("Invalid sortBy value. Allowed values: createdAt, updatedAt, applicationDate, positionTitle, status")
+                );
+    }
+
+    @Test
+    void getApplications_withContradictoryDates_returnsBadRequest() throws Exception {
+        when(applicationService.getApplications(
+                anyString(), anyInt(), anyInt(), anyString(), any(),
+                any(), any(), eq(LocalDate.of(2026, 12, 31)), eq(LocalDate.of(2026, 1, 1))
+        )).thenThrow(new IllegalArgumentException("applicationDateFrom must not be after applicationDateTo"));
+
+        mockMvc.perform(get("/api/applications")
+                        .param("applicationDateFrom", "2026-12-31")
+                        .param("applicationDateTo", "2026-01-01"))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.error").value("Bad Request"),
+                        jsonPath("$.message").value("applicationDateFrom must not be after applicationDateTo")
+                );
     }
 
     @Test
@@ -192,7 +318,12 @@ class ApplicationControllerTest extends AbstractControllerTest {
                 .thenThrow(new ApplicationNotFoundException(3L));
 
         mockMvc.perform(get("/api/applications/{id}", 3L))
-                .andExpect(status().isNotFound());
+                .andExpectAll(
+                        status().isNotFound(),
+                        jsonPath("$.status").value(404),
+                        jsonPath("$.error").value("Not Found"),
+                        jsonPath("$.message").value("Application with id 3 not found")
+                );
 
         verify(applicationService).getApplicationById("user@example.com", 3L);
     }
@@ -230,7 +361,12 @@ class ApplicationControllerTest extends AbstractControllerTest {
         mvcWithRequest(
                 put("/api/applications/{id}", 5L),
                 objectMapper.writeValueAsString(request)
-        ).andExpect(status().isNotFound());
+        ).andExpectAll(
+                status().isNotFound(),
+                jsonPath("$.status").value(404),
+                jsonPath("$.error").value("Not Found"),
+                jsonPath("$.message").value("Application with id 5 not found")
+        );
 
         verify(applicationService).updateApplication(
                 eq("user@example.com"), eq(5L), eq(request)
@@ -247,6 +383,51 @@ class ApplicationControllerTest extends AbstractControllerTest {
         ).andExpect(status().isBadRequest());
 
         verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void updateApplication_withMissingCompanyId_returnsBadRequest() throws Exception {
+        mvcWithRequest(
+                put("/api/applications/{id}", 4L),
+                "{\"positionTitle\": \"Backend Developer\"}"
+        ).andExpectAll(
+                status().isBadRequest(),
+                jsonPath("$.status").value(400),
+                jsonPath("$.fieldErrors.companyId").value("Company ID cannot be null")
+        );
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void updateApplication_withInvalidJobUrl_returnsBadRequest() throws Exception {
+        mvcWithRequest(
+                put("/api/applications/{id}", 4L),
+                "{\"positionTitle\": \"Backend Developer\", \"companyId\": 1, \"jobUrl\": \"invalid-url\"}"
+        ).andExpectAll(
+                status().isBadRequest(),
+                jsonPath("$.status").value(400),
+                jsonPath("$.fieldErrors.jobUrl").value("Invalid job URL format")
+        );
+
+        verifyNoInteractions(applicationService);
+    }
+
+    @Test
+    void updateApplication_whenDuplicate_returnsConflict() throws Exception {
+        ApplicationUpdateRequest request = updateRequest("Senior Developer");
+        when(applicationService.updateApplication(anyString(), eq(4L), eq(request)))
+                .thenThrow(new DuplicateApplicationException());
+
+        mvcWithRequest(
+                put("/api/applications/{id}", 4L),
+                objectMapper.writeValueAsString(request)
+        ).andExpectAll(
+                status().isConflict(),
+                jsonPath("$.status").value(409),
+                jsonPath("$.error").value("Conflict"),
+                jsonPath("$.message").value("An application for this company and position already exists")
+        );
     }
 
     @Test
@@ -285,6 +466,23 @@ class ApplicationControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    void updateApplicationStatus_whenApplicationNotFound_returnsNotFound() throws Exception {
+        ApplicationUpdateStatusRequest request = new ApplicationUpdateStatusRequest(ApplicationStatus.ACCEPTED);
+        when(applicationService.updateApplicationStatus(anyString(), eq(99L), eq(request)))
+                .thenThrow(new ApplicationNotFoundException(99L));
+
+        mvcWithRequest(
+                patch("/api/applications/{id}/status", 99L),
+                objectMapper.writeValueAsString(request)
+        ).andExpectAll(
+                status().isNotFound(),
+                jsonPath("$.status").value(404),
+                jsonPath("$.error").value("Not Found"),
+                jsonPath("$.message").value("Application with id 99 not found")
+        );
+    }
+
+    @Test
     void getStatusHistory_returnsStatusTransitions() throws Exception {
         Instant changedAt = Instant.parse("2026-02-01T09:30:00Z");
         List<ApplicationStatusHistoryResponse> history = List.of(
@@ -309,6 +507,20 @@ class ApplicationControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    void getStatusHistory_whenApplicationNotFound_returnsNotFound() throws Exception {
+        when(applicationService.getStatusHistory(anyString(), eq(99L)))
+                .thenThrow(new ApplicationNotFoundException(99L));
+
+        mockMvc.perform(get("/api/applications/{id}/status-history", 99L))
+                .andExpectAll(
+                        status().isNotFound(),
+                        jsonPath("$.status").value(404),
+                        jsonPath("$.error").value("Not Found"),
+                        jsonPath("$.message").value("Application with id 99 not found")
+                );
+    }
+
+    @Test
     void deleteApplication_withValidId_returnsNoContent() throws Exception {
         mockMvc.perform(delete("/api/applications/{id}", 7L))
                 .andExpect(status().isNoContent());
@@ -322,7 +534,12 @@ class ApplicationControllerTest extends AbstractControllerTest {
                 .when(applicationService).deleteApplication("user@example.com", 8L);
 
         mockMvc.perform(delete("/api/applications/{id}", 8L))
-                .andExpect(status().isNotFound());
+                .andExpectAll(
+                        status().isNotFound(),
+                        jsonPath("$.status").value(404),
+                        jsonPath("$.error").value("Not Found"),
+                        jsonPath("$.message").value("Application with id 8 not found")
+                );
 
         verify(applicationService).deleteApplication("user@example.com", 8L);
     }

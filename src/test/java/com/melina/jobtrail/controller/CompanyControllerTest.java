@@ -1,8 +1,8 @@
 package com.melina.jobtrail.controller;
 
-
 import com.melina.jobtrail.dto.CompanyRequest;
 import com.melina.jobtrail.dto.CompanyResponse;
+import com.melina.jobtrail.exception.CompanyHasApplicationsException;
 import com.melina.jobtrail.exception.CompanyNotFoundException;
 import com.melina.jobtrail.service.CompanyService;
 import org.junit.jupiter.api.Test;
@@ -52,7 +52,48 @@ class CompanyControllerTest extends AbstractControllerTest {
         mockMvc.perform(post("/api/companies")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isBadRequest());
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.error").value("Bad Request"),
+                        jsonPath("$.message").value("Validation failed"),
+                        jsonPath("$.fieldErrors.name").value("Company name cannot be null or blank")
+                );
+
+        verifyNoInteractions(companyService);
+    }
+
+    @Test
+    void createCompany_withBlankName_returnsBadRequestAndFieldErrors() throws Exception {
+        CompanyRequest requestDto = new CompanyRequest("   ", "https://valid.com", "Berlin");
+
+        mockMvc.perform(post("/api/companies")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.message").value("Validation failed"),
+                        jsonPath("$.fieldErrors.name").value("Company name cannot be null or blank")
+                );
+
+        verifyNoInteractions(companyService);
+    }
+
+    @Test
+    void createCompany_withInvalidWebsiteUrl_returnsBadRequestAndFieldErrors() throws Exception {
+        CompanyRequest requestDto = new CompanyRequest("Acme Corp", "not-a-valid-url", "Berlin");
+
+        mockMvc.perform(post("/api/companies")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.error").value("Bad Request"),
+                        jsonPath("$.message").value("Validation failed"),
+                        jsonPath("$.fieldErrors.website").value("Invalid website format")
+                );
 
         verifyNoInteractions(companyService);
     }
@@ -98,7 +139,12 @@ class CompanyControllerTest extends AbstractControllerTest {
                 .thenThrow(new CompanyNotFoundException(5L));
 
         mockMvc.perform(get("/api/companies/{id}", 5L))
-                .andExpect(status().isNotFound());
+                .andExpectAll(
+                        status().isNotFound(),
+                        jsonPath("$.status").value(404),
+                        jsonPath("$.error").value("Not Found"),
+                        jsonPath("$.message").value("Company with id 5 not found")
+                );
 
         verify(companyService).getCompanyById(anyString(), eq(5L));
     }
@@ -132,7 +178,12 @@ class CompanyControllerTest extends AbstractControllerTest {
         mockMvc.perform(put("/api/companies/{id}", 7L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isNotFound());
+                .andExpectAll(
+                        status().isNotFound(),
+                        jsonPath("$.status").value(404),
+                        jsonPath("$.error").value("Not Found"),
+                        jsonPath("$.message").value("Company with id 7 not found")
+                );
 
         verify(companyService).updateCompany(anyString(), eq(7L), any(CompanyRequest.class));
     }
@@ -144,7 +195,28 @@ class CompanyControllerTest extends AbstractControllerTest {
         mockMvc.perform(put("/api/companies/{id}", 8L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isBadRequest());
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.message").value("Validation failed"),
+                        jsonPath("$.fieldErrors.name").value("Company name cannot be null or blank")
+                );
+
+        verifyNoInteractions(companyService);
+    }
+
+    @Test
+    void updateCompany_withInvalidWebsiteUrl_returnsBadRequest() throws Exception {
+        CompanyRequest requestDto = new CompanyRequest("Valid Name", "not-a-valid-url", null);
+
+        mockMvc.perform(put("/api/companies/{id}", 8L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpectAll(
+                        status().isBadRequest(),
+                        jsonPath("$.status").value(400),
+                        jsonPath("$.fieldErrors.website").value("Invalid website format")
+                );
 
         verifyNoInteractions(companyService);
     }
@@ -165,8 +237,29 @@ class CompanyControllerTest extends AbstractControllerTest {
                 .when(companyService).deleteCompany(anyString(), eq(10L));
 
         mockMvc.perform(delete("/api/companies/{id}", 10L))
-                .andExpect(status().isNotFound());
+                .andExpectAll(
+                        status().isNotFound(),
+                        jsonPath("$.status").value(404),
+                        jsonPath("$.error").value("Not Found"),
+                        jsonPath("$.message").value("Company with id 10 not found")
+                );
 
         verify(companyService).deleteCompany(anyString(), eq(10L));
+    }
+
+    @Test
+    void deleteCompany_whenCompanyHasApplications_returnsConflict() throws Exception {
+        doThrow(new CompanyHasApplicationsException(11L))
+                .when(companyService).deleteCompany(anyString(), eq(11L));
+
+        mockMvc.perform(delete("/api/companies/{id}", 11L))
+                .andExpectAll(
+                        status().isConflict(),
+                        jsonPath("$.status").value(409),
+                        jsonPath("$.error").value("Conflict"),
+                        jsonPath("$.message").value("Company with id 11 cannot be deleted while applications reference it")
+                );
+
+        verify(companyService).deleteCompany(anyString(), eq(11L));
     }
 }

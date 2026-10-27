@@ -10,12 +10,12 @@ import jakarta.validation.constraints.Size;
 public record ProfileSkillRequest(
 
         @Schema(description = "Bezeichnung der Fähigkeit", example = "Spring Boot")
-        @NotBlank
-        @Size(max = 100)
+        @NotBlank(message = "Skill name cannot be null or blank")
+        @Size(max = 100, message = "Skill name must not exceed 100 characters")
         String name,
 
         @Schema(description = "Kompetenzniveau (BEGINNER, ELEMENTARY, INTERMEDIATE, PROFICIENT, EXPERT)", example = "EXPERT")
-        @NotNull
+        @NotNull(message = "Skill level cannot be null")
         SkillLevel level,
 
         @Schema(description = "Markierung als Kernkompetenz", example = "true")

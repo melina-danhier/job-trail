@@ -14,7 +14,7 @@ public record ApplicationStatusHistoryResponse(
         @Schema(description = "Vorheriger Status", example = "APPLIED")
         ApplicationStatus previousStatus,
 
-        @Schema(description = "Neuer Status nach dem Wechsel", example = "INTERVIEW")
+        @Schema(description = "Neuer Status nach dem Wechsel", example = "INTERVIEW_SCHEDULED")
         ApplicationStatus newStatus,
 
         @Schema(description = "Zeitpunkt der Statusänderung", example = "2026-10-17T11:30:00Z")

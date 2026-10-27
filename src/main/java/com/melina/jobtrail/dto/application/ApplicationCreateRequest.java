@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.hibernate.validator.constraints.URL;
 
 import java.time.LocalDate;
 
@@ -23,6 +24,7 @@ public record ApplicationCreateRequest(
         LocalDate applicationDate,
 
         @Schema(description = "Link zur Online-Stellenausschreibung", example = "https://techcorp.example.com/jobs/senior-java-dev")
+        @URL(message = "Invalid job URL format")
         @Size(max = 255, message = "Job URL must not exceed 255 characters")
         String jobUrl
 

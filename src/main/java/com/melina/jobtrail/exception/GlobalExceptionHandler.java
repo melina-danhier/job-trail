@@ -66,13 +66,37 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
-    public ResponseEntity<ErrorResponse> handleHandlerMethodValidationException() {
-        return createErrorResponseEntity(HttpStatus.BAD_REQUEST, "Invalid pagination parameters");
+    public ResponseEntity<ErrorResponse> handleHandlerMethodValidationException(HandlerMethodValidationException ex) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        ex.getValueResults().forEach(result -> {
+            String paramName = result.getMethodParameter().getParameterName();
+            if (paramName == null) {
+                paramName = "parameter";
+            }
+            final String finalParamName = paramName;
+            result.getResolvableErrors().forEach(error ->
+                    fieldErrors.put(finalParamName, error.getDefaultMessage() != null ? error.getDefaultMessage() : "Invalid parameter")
+            );
+        });
+        return createErrorResponseEntity(
+                HttpStatus.BAD_REQUEST,
+                "Invalid pagination parameters",
+                fieldErrors.isEmpty() ? null : fieldErrors
+        );
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolationException() {
-        return createErrorResponseEntity(HttpStatus.BAD_REQUEST, "Invalid pagination parameters");
+    public ResponseEntity<ErrorResponse> handleConstraintViolationException(ConstraintViolationException ex) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        ex.getConstraintViolations().forEach(violation -> {
+            String property = violation.getPropertyPath() != null ? violation.getPropertyPath().toString() : "parameter";
+            fieldErrors.put(property, violation.getMessage() != null ? violation.getMessage() : "Invalid parameter");
+        });
+        return createErrorResponseEntity(
+                HttpStatus.BAD_REQUEST,
+                "Invalid pagination parameters",
+                fieldErrors.isEmpty() ? null : fieldErrors
+        );
     }
 
     @ExceptionHandler(AiServiceException.class)
@@ -139,7 +163,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
         ex.getBindingResult().getFieldErrors().forEach(error ->
-                fieldErrors.put(error.getField(), error.getDefaultMessage())
+                fieldErrors.put(error.getField(), error.getDefaultMessage() != null ? error.getDefaultMessage() : "Invalid value")
+        );
+        ex.getBindingResult().getGlobalErrors().forEach(error ->
+                fieldErrors.put(error.getObjectName(), error.getDefaultMessage() != null ? error.getDefaultMessage() : "Invalid value")
         );
         return createErrorResponseEntity(HttpStatus.BAD_REQUEST, "Validation failed", fieldErrors);
     }
